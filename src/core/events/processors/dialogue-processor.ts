@@ -30,6 +30,7 @@ export default class DialogueProcessor implements IEventProcessor {
     const displayLine = hkify(isJaLocale() && event.ttsText ? event.ttsText : event.message || '')
     gameStore.currentLine = displayLine
     uiStore.showCharacterMotionText = event.motionText || ''
+    uiStore.isNarrationLine = false
 
     gameStore.appendGameMessage({
       type: 'reply',

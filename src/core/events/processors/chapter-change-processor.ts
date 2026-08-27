@@ -13,5 +13,11 @@ export default class ChapterChangeProcessor implements IEventProcessor {
     const gameStore = useGameStore()
     const uiStore = useUIStore()
     if (gameStore.runningScript) gameStore.runningScript.currentChapterName = event.chapterName
+
+    // 触发全屏章节卡（序号递增保证同名章节也能重新播放入场动画）
+    if (event.chapterName && event.chapterName.trim() !== '') {
+      uiStore.chapterCardText = event.chapterName
+      uiStore.chapterCardSeq++
+    }
   }
 }

@@ -1,10 +1,11 @@
 <template>
   <Transition name="slide-in">
     <div v-if="uiStore.notification.isVisible" class="notification" :class="typeClass">
-      <!-- 角色头像区域 -->
-      <div class="notification-avatar">
+      <div
+        v-if="uiStore.notification.avatarUrl"
+        class="notification-avatar"
+      >
         <img
-          v-if="uiStore.notification.avatarUrl"
           :src="uiStore.notification.avatarUrl"
           alt="avatar"
           class="avatar-image"
@@ -42,19 +43,40 @@ const typeClass = computed(() => `notification-${uiStore.notification.type}`)
   top: calc(20px + var(--safe-area-inset-top));
   @apply flex items-center gap-4;
   @apply px-6 py-4 min-w-80 max-w-[480px];
-
-  /* 玻璃态效果 */
   background: linear-gradient(135deg, rgba(30, 30, 40, 0.95) 0%, rgba(20, 20, 30, 0.9) 100%);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-
   border-radius: 0 16px 16px 0;
   box-shadow:
     4px 4px 20px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-/* 类型样式 */
+.notification::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 0 2px 2px 0;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.notification-error::before {
+  background: #ff7a7a;
+}
+
+.notification-success::before {
+  background: #6dff9c;
+}
+
+.notification-info::before {
+  background: #6ab4ff;
+}
+
+.notification-warning::before {
+  background: #ffc864;
+}
+
 .notification-error {
   box-shadow:
     0 0 15px rgba(255, 100, 100, 0.5),

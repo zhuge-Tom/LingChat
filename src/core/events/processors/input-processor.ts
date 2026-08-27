@@ -16,7 +16,5 @@ export default class InputProcessor implements IEventProcessor {
     gameStore.currentStatus = 'input'
     uiStore.showPlayerHintLine = event.hint
     uiStore.showCharacterLine = ''
-
-    console.log('玩家输入事件执行' + event.hint)
   }
 }

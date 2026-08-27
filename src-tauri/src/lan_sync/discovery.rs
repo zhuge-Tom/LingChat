@@ -20,7 +20,8 @@ use tracing::{debug, info, warn};
 
 use super::messages::{
     DeviceIdentity, DiscoveryMessage, PeerInfo, MDNS_SERVICE_TYPE, TXT_DATA_VERSION,
-    TXT_DEVICE_ID, TXT_DEVICE_NAME, TXT_FILE_COUNT, TXT_INSTANCE_ID, UDP_DISCOVERY_PORT,
+    TXT_DEVICE_ID, TXT_DEVICE_NAME, TXT_FILE_COUNT, TXT_INSTANCE_ID, TXT_SYNC_TOKEN,
+    UDP_DISCOVERY_PORT,
 };
 
 // ─── Announcer（宣告自己存在）─────────────────────────────────
@@ -165,6 +166,7 @@ async fn start_udp_listener(
         port,
         data_version: 0,
         file_count: 0,
+        sync_token: String::new(),
     };
     let response_json = serde_json::to_vec(&msg).map_err(|e| format!("序列化失败: {e}"))?;
     let response_data = Arc::new(response_json);
@@ -302,6 +304,10 @@ async fn browse_mdns(
                             .get_property_val_str(TXT_FILE_COUNT)
                             .and_then(|v| v.parse().ok())
                             .unwrap_or(0);
+                        let sync_token = txt
+                            .get_property_val_str(TXT_SYNC_TOKEN)
+                            .unwrap_or_default()
+                            .to_string();
                         let port = info.get_port();
                         let host = info
                             .get_addresses()
@@ -319,6 +325,7 @@ async fn browse_mdns(
                                 port,
                                 data_version,
                                 file_count,
+                                sync_token,
                             });
                         }
                     }
@@ -372,6 +379,7 @@ async fn send_udp_broadcast(my_instance_id: &str) -> Result<Vec<PeerInfo>, Strin
         port: 0,
         data_version: 0,
         file_count: 0,
+        sync_token: String::new(),
     };
 
     let json =
@@ -406,6 +414,7 @@ async fn send_udp_broadcast(my_instance_id: &str) -> Result<Vec<PeerInfo>, Strin
                             port: msg.port,
                             data_version: msg.data_version,
                             file_count: msg.file_count,
+                            sync_token: msg.sync_token,
                         });
                     }
                 }

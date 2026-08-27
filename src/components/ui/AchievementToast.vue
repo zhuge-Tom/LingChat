@@ -117,10 +117,14 @@ watch(
 
 /* --- 绿色 (普通/common) 主题 --- */
 .achievement-green {
-  border: 1px solid rgba(74, 222, 128, 0.2);
+  background:
+    radial-gradient(circle at center, rgba(74, 222, 128, 0.08) 0%, transparent 50%),
+    linear-gradient(145deg, rgba(10, 30, 18, 0.7), rgba(10, 10, 10, 0.5));
+  border: 1px solid rgba(74, 222, 128, 0.25);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.6),
-    0 0 15px rgba(74, 222, 128, 0.1) inset;
+    0 10px 40px -10px rgba(0, 0, 0, 0.8),
+    0 0 20px rgba(74, 222, 128, 0.15) inset,
+    0 0 15px rgba(74, 222, 128, 0.1);
 }
 
 .achievement-green .glow-effect {

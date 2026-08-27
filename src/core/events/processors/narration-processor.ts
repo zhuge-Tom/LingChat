@@ -15,6 +15,7 @@ export default class NarrationProcessor implements IEventProcessor {
     // 更新游戏状态
     gameStore.currentStatus = 'responding'
     uiStore.showCharacterLine = event.text
+    uiStore.isNarrationLine = true
 
     if (event.displayName) {
       uiStore.showCharacterTitle = event.displayName
@@ -29,7 +30,5 @@ export default class NarrationProcessor implements IEventProcessor {
       displayName: '旁白',
       content: event.text,
     })
-
-    console.log('叙事模式执行' + event.text)
   }
 }

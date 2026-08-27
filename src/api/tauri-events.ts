@@ -61,18 +61,15 @@ export function initializeTauriEventListeners() {
     const payload = event.payload as Record<string, unknown>
     // 试玩中止后迟到的流式回复：直接丢弃，不放进事件队列
     if (isStalePreviewReply(payload)) return
-    console.log('[Tauri] ai:reply', event.payload)
     eventQueue.addEvent(asEvent(payload, { type: 'reply', defaultDuration: -1 }))
   })
 
   listen('ai:thinking', (event) => {
-    console.log('[Tauri] ai:thinking', event.payload)
     eventQueue.addEvent(asEvent(event.payload, { type: 'thinking', defaultDuration: 0 }))
   })
 
   listen('ai:thinking_progress', (event) => {
     const payload = event.payload as { thinkingLength?: number }
-    console.log('[Tauri] ai:thinking_progress', payload)
     const gameStore = useGameStore()
     if (typeof payload.thinkingLength === 'number') {
       gameStore.thinkingLength = payload.thinkingLength
@@ -81,7 +78,6 @@ export function initializeTauriEventListeners() {
 
   listen('ai:error', (event) => {
     const p = event.payload as Record<string, unknown>
-    console.log('[Tauri] ai:error', p)
     interruptToolActivities()
     eventQueue.addEvent({
       type: 'error',
@@ -218,7 +214,6 @@ export function initializeTauriEventListeners() {
   })
 
   listen('status:reset', (event) => {
-    console.log('[Tauri] status:reset', event.payload)
     eventQueue.addEvent(asEvent(event.payload, { type: 'status_reset', defaultDuration: 0 }))
   })
 
@@ -228,7 +223,6 @@ export function initializeTauriEventListeners() {
       orphanFiles?: number
       orphanSize?: number
     }
-    console.log('[Tauri] tts:cleanup', payload)
     try {
       localStorage.setItem(
         'lingchat:last_tts_cleanup',
@@ -248,7 +242,6 @@ export function initializeTauriEventListeners() {
 
   listen('adventure:unlocked', (event) => {
     const payload = event.payload as any
-    console.log('[Tauri] adventure:unlocked', payload)
     const adventureStore = useAdventureStore()
     if (payload?.adventure_folder) {
       adventureStore.unlockNotifications.push(payload)
@@ -257,7 +250,6 @@ export function initializeTauriEventListeners() {
 
   listen('adventure:completed', (event) => {
     const payload = event.payload as any
-    console.log('[Tauri] adventure:completed', payload)
     const adventureStore = useAdventureStore()
     if (payload?.adventure_folder) {
       adventureStore.markAdventureCompleted(payload.adventure_folder)
@@ -268,8 +260,6 @@ export function initializeTauriEventListeners() {
 
   listen('save:auto-saved', async (event) => {
     const payload = event.payload as { save_id: number; title: string; timestamp: string }
-    console.log('[Tauri] save:auto-saved', payload)
-
     // Capture screenshot for auto-save slot
     const gameStore = useGameStore()
     const screenshotPath = await gameStore.captureScreenshot()
@@ -345,7 +335,6 @@ export function initializeTauriEventListeners() {
   })
 
   listen('script:end', (event) => {
-    console.log('[Tauri] script:end', event.payload)
     eventQueue.addEvent(
       asEvent(event.payload, { type: 'script_end', defaultDuration: 0, isFinal: true }),
     )
@@ -359,7 +348,6 @@ export function initializeTauriEventListeners() {
 
   listen('character:switch', async (event) => {
     const payload = event.payload as { type: string; roleId: number; characterName: string }
-    console.log('[Tauri] character:switch', payload)
     const gameStore = useGameStore()
     const uiStore = useUIStore()
     // 先确保角色数据已加载（立绘/名字都从这里取）
@@ -379,14 +367,9 @@ export function initializeTauriEventListeners() {
 
   listen('scene:switch', (event) => {
     const payload = event.payload as { type: string; scene: SceneInfo }
-    console.log('[Tauri] scene:switch', payload)
     const gameStore = useGameStore()
     const uiStore = useUIStore()
     gameStore.setCurrentScene(payload.scene)
     uiStore.setCurrentBackground(payload.scene.background ?? '')
   })
-
-  console.log(
-    '[Tauri] Event listeners initialized (ai + ai:thinking_progress + tts:cleanup + adventure + auto-save + 13 script events + character:switch + scene:switch)',
-  )
 }

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -224,19 +225,20 @@ fn default_avatar_path(resource_folder: &str) -> String {
     avatar_dir.to_string_lossy().into_owned()
 }
 
+fn is_safe_component(s: &str) -> bool {
+    !s.is_empty() && !s.contains("..") && !s.contains('/') && !s.contains('\\')
+}
+
+fn avatar_path_cache() -> &'static Mutex<HashMap<String, String>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 /// 在目录中查找文件名（不含扩展名）匹配的图片文件
 pub(crate) fn find_emotion_file(dir: &PathBuf, stem: &str, extensions: &[&str]) -> Option<PathBuf> {
-    let entries = fs::read_dir(dir).ok()?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        if !extensions.contains(&ext.to_lowercase().as_str()) {
-            continue;
-        }
-        if path.file_stem().and_then(|s| s.to_str()) == Some(stem) {
+    for ext in extensions {
+        let path = dir.join(format!("{stem}.{ext}"));
+        if path.is_file() {
             return Some(path);
         }
     }
@@ -254,46 +256,44 @@ pub async fn get_character_list(
     let state = app.state::<AppState>();
     let db = &state.db;
 
-    let all_roles = RoleRepo::get_all_main_roles(db)
+    let (page_roles, total) = RoleRepo::get_main_roles_page(db, page, page_size)
         .await
         .map_err(|e| format!("查询角色列表失败: {}", e))?;
+    let total = total as i64;
+    let total_pages = ((total as f64) / (page_size.max(1) as f64)).ceil() as i32;
 
-    let total = all_roles.len() as i64;
-    let total_pages = ((total as f64) / (page_size as f64)).ceil() as i32;
-    let start = ((page - 1) * page_size).max(0) as usize;
-    // 防御：start 可能 > len（极端：page 远超 total_pages），反向切片会 panic。
-    // 这里把 start 钳制到 len，使切片返回空数组而不是崩溃。
-    let start = start.min(all_roles.len());
-    let end = (start + page_size as usize).min(all_roles.len());
-    let page_roles = &all_roles[start..end];
+    let (prepared, all_keys) = {
+        let service = state.ai_service.lock().await;
+        let mut prepared = Vec::new();
+        let mut all_keys = Vec::new();
+        for role in &page_roles {
+            let folder = role.resource_folder.clone().unwrap_or_default();
+            let keys: Vec<String> = service
+                .script_manager
+                .get_character_adventures(&folder)
+                .into_iter()
+                .map(|adv| adv.folder_key.clone())
+                .collect();
+            let total_adventures = keys.len() as i32;
+            all_keys.extend(keys.iter().cloned());
+            prepared.push((folder, keys, total_adventures));
+        }
+        (prepared, all_keys)
+    };
 
-    // Pre-compute adventure counts for all characters on this page
+    let unlocked = crate::adventures::manager::AdventureManager::unlocked_set(db, &all_keys)
+        .await
+        .unwrap_or_default();
+
     let mut items = Vec::new();
-    for role in page_roles {
-        let folder = role.resource_folder.clone().unwrap_or_default();
+    for (role, (folder, adventure_keys, total_adventures)) in
+        page_roles.into_iter().zip(prepared)
+    {
         let settings = read_character_settings(&folder);
-
-        let (total_adventures, adventure_count) = {
-            let service = state.ai_service.lock().await;
-            let adventures = service.script_manager.get_character_adventures(&folder);
-            let total = adventures.len() as i32;
-            let unlocked = {
-                let mut count = 0i32;
-                for adv in &adventures {
-                    if crate::adventures::manager::AdventureManager::is_unlocked(
-                        db,
-                        &adv.folder_key,
-                    )
-                    .await
-                    .unwrap_or(false)
-                    {
-                        count += 1;
-                    }
-                }
-                count
-            };
-            (total, unlocked)
-        };
+        let adventure_count = adventure_keys
+            .iter()
+            .filter(|k| unlocked.contains(*k))
+            .count() as i32;
 
         items.push(CharacterListItem {
             character_id: role.id,
@@ -443,6 +443,25 @@ pub fn get_avatar_file(
     emotion: String,
     clothes_name: String,
 ) -> Result<String, String> {
+    if !is_safe_component(&character_folder) || !is_safe_component(&emotion) {
+        return Err("非法角色或情绪路径".into());
+    }
+    if !clothes_name.is_empty()
+        && clothes_name != "default"
+        && !is_safe_component(&clothes_name)
+    {
+        return Err("非法服装路径".into());
+    }
+
+    let cache_key = format!("{character_folder}|{emotion}|{clothes_name}");
+    if let Ok(cache) = avatar_path_cache().lock() {
+        if let Some(p) = cache.get(&cache_key) {
+            if Path::new(p).is_file() {
+                return Ok(p.clone());
+            }
+        }
+    }
+
     let allowed_extensions = ["png", "jpg", "jpeg", "webp", "bmp", "gif"];
 
     let clothes_subdir = if clothes_name.is_empty() || clothes_name == "default" {
@@ -451,58 +470,61 @@ pub fn get_avatar_file(
         clothes_name.clone()
     };
 
-    let mut candidate_bases: Vec<PathBuf> = Vec::new();
-
-    // 1. 主角色: characters/{folder}/avatar
-    let main_avatar = characters_dir().join(&character_folder).join("avatar");
-    if main_avatar.exists() {
-        candidate_bases.push(main_avatar);
-    }
-
-    // 2. NPC/脚本角色: <剧本目录>/characters/{folder}/avatar
-    for script_dir in script_package_dirs() {
-        let npc_avatar = script_dir
-            .join("characters")
-            .join(&character_folder)
-            .join("avatar");
-        if npc_avatar.exists() {
-            candidate_bases.push(npc_avatar);
-        }
-    }
-
-    for base in &candidate_bases {
+    let try_dir = |base: &PathBuf| -> Option<PathBuf> {
         let search_dir = if clothes_subdir.is_empty() {
             base.clone()
         } else {
             base.join(&clothes_subdir)
         };
-
         if !search_dir.exists() {
-            continue;
+            return None;
         }
-
         if let Some(found) = find_emotion_file(&search_dir, &emotion, &allowed_extensions) {
-            let canon = found
-                .canonicalize()
-                .map_err(|e| format!("路径解析失败: {}", e))?;
-            return Ok(canon.to_string_lossy().into_owned());
+            return Some(found);
         }
-
-        // 如果情绪是"平静"没找到，回退到"正常"
         if emotion == "平静" {
-            if let Some(found) = find_emotion_file(&search_dir, "正常", &allowed_extensions) {
-                let canon = found
-                    .canonicalize()
-                    .map_err(|e| format!("路径解析失败: {}", e))?;
-                return Ok(canon.to_string_lossy().into_owned());
+            return find_emotion_file(&search_dir, "正常", &allowed_extensions);
+        }
+        None
+    };
+
+    let main_avatar = characters_dir().join(&character_folder).join("avatar");
+    let mut found = if main_avatar.exists() {
+        try_dir(&main_avatar)
+    } else {
+        None
+    };
+
+    if found.is_none() {
+        for script_dir in script_package_dirs() {
+            let npc_avatar = script_dir
+                .join("characters")
+                .join(&character_folder)
+                .join("avatar");
+            if npc_avatar.exists() {
+                if let Some(p) = try_dir(&npc_avatar) {
+                    found = Some(p);
+                    break;
+                }
             }
         }
     }
 
-    Err(format!(
-        "未找到角色头像: folder={}, emotion={}, clothes={}",
-        character_folder, emotion, clothes_name
-    ))
+    let found = found.ok_or_else(|| {
+        format!(
+            "未找到角色头像: folder={}, emotion={}, clothes={}",
+            character_folder, emotion, clothes_name
+        )
+    })?;
+    let result = found
+        .canonicalize()
+        .map_err(|e| format!("路径解析失败: {}", e))?
+        .to_string_lossy()
+        .into_owned();
+    if let Ok(mut cache) = avatar_path_cache().lock() {
+        cache.insert(cache_key, result.clone());
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -714,4 +736,120 @@ pub async fn delete_character(
     let _ = app.emit("role:list-updated", ());
 
     Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmotionUpload {
+    pub name: String,
+    pub file_name: String,
+    pub data: Vec<u8>,
+}
+
+fn file_ext(name: &str) -> &'static str {
+    let lower = name.to_lowercase();
+    if lower.ends_with(".png") {
+        "png"
+    } else if lower.ends_with(".webp") {
+        "webp"
+    } else if lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
+        "jpg"
+    } else if lower.ends_with(".gif") {
+        "gif"
+    } else {
+        "png"
+    }
+}
+
+#[tauri::command]
+pub async fn create_character(
+    app: AppHandle,
+    resource_folder: String,
+    settings_json: String,
+    avatar_file_name: String,
+    avatar_data: Vec<u8>,
+    emotions: Vec<EmotionUpload>,
+) -> Result<serde_json::Value, String> {
+    if !is_safe_component(&resource_folder) {
+        return Err("非法角色目录名".into());
+    }
+    let base = characters_dir();
+    let folder = base.join(&resource_folder);
+    if folder.exists() {
+        return Err(format!("角色目录已存在: {}", resource_folder));
+    }
+    let avatar_dir = folder.join("avatar");
+    fs::create_dir_all(&avatar_dir).map_err(|e| format!("创建角色目录失败: {e}"))?;
+
+    let mut settings_val: serde_json::Value =
+        serde_json::from_str(&settings_json).map_err(|e| format!("设置 JSON 无效: {e}"))?;
+    if let Some(obj) = settings_val.as_object_mut() {
+        if !obj.contains_key("offset_y") {
+            if let Some(offset) = obj.get("offset").cloned() {
+                obj.insert("offset_y".into(), offset);
+            }
+        }
+        obj.remove("offset");
+        obj.insert(
+            "character_folder".into(),
+            serde_json::Value::String(resource_folder.clone()),
+        );
+    }
+
+    let mut settings: CharacterSettings =
+        serde_json::from_value(settings_val).map_err(|e| format!("设置校验失败: {e}"))?;
+    remove_legacy_voice_model_fields(&mut settings);
+    settings.character_folder = resource_folder.clone();
+
+    let mut save_data =
+        serde_json::to_value(&settings).map_err(|e| format!("配置规范化失败: {e}"))?;
+    if let Some(obj) = save_data.as_object_mut() {
+        obj.remove("character_id");
+        obj.remove("resource_path");
+        obj.remove("script_key");
+        obj.remove("script_role_key");
+    }
+    let yaml = serde_yaml::to_string(&save_data).map_err(|e| format!("序列化失败: {e}"))?;
+    fs::write(folder.join("settings.yml"), yaml).map_err(|e| format!("写入 settings.yml 失败: {e}"))?;
+
+    let avatar_path = avatar_dir.join(format!("头像.{}", file_ext(&avatar_file_name)));
+    fs::write(&avatar_path, avatar_data).map_err(|e| format!("写入头像失败: {e}"))?;
+
+    for emo in emotions {
+        if !is_safe_component(&emo.name) {
+            let _ = fs::remove_dir_all(&folder);
+            return Err(format!("非法表情名: {}", emo.name));
+        }
+        let path = avatar_dir.join(format!("{}.{}", emo.name, file_ext(&emo.file_name)));
+        if let Err(e) = fs::write(&path, emo.data) {
+            let _ = fs::remove_dir_all(&folder);
+            return Err(format!("写入表情 {} 失败: {e}", emo.name));
+        }
+    }
+
+    let data_dir = data_dir();
+    let state = app.state::<AppState>();
+    crate::init::role_sync::sync_roles_from_folder(&state.db, &data_dir)
+        .await
+        .map_err(|e| {
+            let _ = fs::remove_dir_all(&folder);
+            format!("同步角色失败: {e}")
+        })?;
+
+    let role = RoleRepo::get_all_main_roles(&state.db)
+        .await
+        .map_err(|e| format!("查询新角色失败: {e}"))?
+        .into_iter()
+        .find(|r| r.resource_folder.as_deref() == Some(resource_folder.as_str()))
+        .ok_or_else(|| "角色已写入但未能入库".to_string())?;
+
+    let _ = app.emit("role:list-updated", ());
+    Ok(serde_json::json!({
+        "success": true,
+        "data": {
+            "character_id": role.id,
+            "title": role.name,
+            "resource_folder": resource_folder,
+        }
+    }))
 }

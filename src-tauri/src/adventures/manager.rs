@@ -20,6 +20,21 @@ impl AdventureManager {
         Ok(exists)
     }
 
+    pub async fn unlocked_set(
+        db: &DatabaseConnection,
+        folders: &[String],
+    ) -> Result<std::collections::HashSet<String>> {
+        if folders.is_empty() {
+            return Ok(std::collections::HashSet::new());
+        }
+        let rows = adventure_unlock::Entity::find()
+            .filter(adventure_unlock::Column::AdventureFolder.is_in(folders.to_vec()))
+            .all(db)
+            .await
+            .map_err(|e| anyhow!("{e}"))?;
+        Ok(rows.into_iter().map(|r| r.adventure_folder).collect())
+    }
+
     /// 解锁一个冒险，如果不存在的话就新增一行
     pub async fn unlock_adventure(
         db: &DatabaseConnection,

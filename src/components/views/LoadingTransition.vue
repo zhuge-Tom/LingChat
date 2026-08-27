@@ -222,22 +222,18 @@
           </div>
 
           <!-- 进度条 -->
-          <div class="w-[60vh] flex items-center space-y-2 mt-4">
+          <div class="w-[min(60vh,86vw)] mt-5">
+            <div class="mb-1.5 flex justify-between text-[11px] font-mono tracking-widest text-cyan-300/70">
+              <span>LOADING</span>
+              <span>{{ Math.floor(progress) }}%</span>
+            </div>
             <div
-              class="w-[60vh] h-6 bg-slate-950/80 rounded-full border border-teal-500/20 p-0.5 relative overflow-hidden flex items-center"
+              class="h-2 rounded-full border border-teal-400/25 bg-slate-950/70 overflow-hidden"
             >
               <div
-                class="h-full bg-gradient-to-r from-teal-500/80 to-cyan-400 rounded-full glow-cyan transition-all duration-100"
+                class="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-300 glow-cyan transition-all duration-150"
                 :style="{ width: progress + '%' }"
-              >
-                <div class="w-full h-0.5 bg-white/30 rounded-full"></div>
-              </div>
-            </div>
-
-            <div
-              class="absolute -right-12 justify-center items-center text-sm font-mono text-cyan-300/80"
-            >
-              <span>{{ Math.floor(progress) }}%</span>
+              ></div>
             </div>
           </div>
 

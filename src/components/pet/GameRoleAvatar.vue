@@ -68,29 +68,30 @@
         <audio ref="bubbleAudio"></audio>
       </div>
 
-      <!-- 6. 气泡表情 -->
+      <!-- 6. 气泡表情（盒子放大到头像框 2.8 倍，见 constants/sprite.ts 的 PET_BUBBLE_BOX） -->
       <div
         :class="[
-          'absolute w-full h-full top-[-2%] left-[-2%] z-73 bg-contain bg-no-repeat pointer-events-none transition-all duration-300 origin-bottom-left',
+          'absolute z-73 bg-contain bg-no-repeat pointer-events-none transition-all duration-300 origin-bottom-left',
           bubbleClasses,
         ]"
-        :style="bubbleStyles"
+        :style="{ ...bubbleStyles, ...PET_BUBBLE_BOX_STYLE }"
       ></div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, toRefs } from 'vue'
-import { invoke, convertFileSrc } from '@tauri-apps/api/core'
+import { computed, ref, toRefs } from 'vue'
 import BAParticles from './BAParticles.vue'
 import ImageCrossFade from '@/components/ui/ImageAcrossFade.vue'
 import StarField from '../game/standard/particles/StarField.vue'
 import type { GameRole } from '@/stores/modules/game/state'
-import { useGameStore } from '@/stores/modules/game'
-import { EMOTION_CONFIG, EMOTION_CONFIG_EMO } from '@/controllers/emotion/config'
 import { useUIStore } from '@/stores/modules/ui/ui'
+import { PET_BUBBLE_BOX, type PetBubbleBox } from '@/constants/sprite'
+import { useEmotionPlayback } from '@/composables/useEmotionPlayback'
 import './avatar-animation.css'
+
+const PET_BUBBLE_BOX_STYLE: PetBubbleBox = PET_BUBBLE_BOX
 
 const props = defineProps<{ role: GameRole }>()
 const { role } = toRefs(props)
@@ -99,15 +100,20 @@ const emit = defineEmits(['avatar-click'])
 const bubbleAudio = ref<HTMLAudioElement | null>(null)
 const imageFadeRef = ref<InstanceType<typeof ImageCrossFade> | null>(null)
 const uiStore = useUIStore()
-const gameStore = useGameStore()
 
-const activeAnimationClass = ref('normal')
-const isBubbleVisible = ref(false)
-const currentBubbleImageUrl = ref('')
-const currentBubbleClass = ref('')
-
-let bubbleTimeoutId: number | null = null
-let latestEmotionId = 0
+const {
+  targetAvatarUrl,
+  activeAnimationClass,
+  isBubbleVisible,
+  currentBubbleImageUrl,
+  currentBubbleClass,
+  handleAnimationEnd,
+} = useEmotionPlayback({
+  role,
+  imageFadeRef,
+  bubbleAudio,
+  restartBubble: false,
+})
 
 const containerClasses = computed(() => ({
   [activeAnimationClass.value]: true,
@@ -126,6 +132,7 @@ const imageStyles = computed(() => ({
 const bubbleClasses = computed(() => ({
   'opacity-100': isBubbleVisible.value,
   'opacity-0': !isBubbleVisible.value,
+  'bubble-pop': isBubbleVisible.value,
   [currentBubbleClass.value]: isBubbleVisible.value && currentBubbleClass.value,
 }))
 
@@ -134,144 +141,6 @@ const bubbleStyles = computed(() => ({
 }))
 
 const handleAvatarClick = () => emit('avatar-click')
-
-const handleAnimationEnd = () => {
-  if (activeAnimationClass.value !== 'normal') {
-    activeAnimationClass.value = 'normal'
-  }
-}
-
-const targetAvatarUrl = ref('')
-let resolveAvatarId = 0
-
-async function resolveAvatar() {
-  const r = role.value
-  const clothesName = r.clothesName === '默认' || !r.clothesName ? 'default' : r.clothesName
-  const emotion = r.emotion
-  const mappedEmotion = EMOTION_CONFIG_EMO[emotion] || '正常'
-
-  const currentId = ++resolveAvatarId
-  try {
-    const path = await invoke<string>('get_avatar_file', {
-      characterFolder: r.character_folder,
-      emotion: mappedEmotion,
-      clothesName,
-    })
-    if (currentId === resolveAvatarId) {
-      targetAvatarUrl.value = convertFileSrc(path)
-    }
-  } catch {
-    if (currentId === resolveAvatarId) {
-      targetAvatarUrl.value = ''
-    }
-  }
-}
-
-watch(
-  () => [
-    role.value.roleId,
-    role.value.emotion,
-    role.value.clothesName,
-    role.value.character_folder,
-  ],
-  () => resolveAvatar(),
-  { immediate: true },
-)
-
-watch(
-  () => role.value.emotion,
-  async (newEmotion) => {
-    const currentId = ++latestEmotionId
-    await resolveAvatar()
-    await nextTick()
-    if (imageFadeRef.value) await imageFadeRef.value.waitForLoad()
-    if (currentId !== latestEmotionId) return
-
-    const config = EMOTION_CONFIG[newEmotion]
-    if (!config) return
-
-    if (config.animation && config.animation !== 'none')
-      activeAnimationClass.value = config.animation
-
-    if (config.bubbleImage && config.bubbleImage !== 'none') {
-      // 修复代码：移除 ?t=... 形式的 cache-buster，避免由于本地重新加载导致的疯狂闪烁
-      currentBubbleImageUrl.value = config.bubbleImage
-      currentBubbleClass.value = config.bubbleClass
-
-      if (bubbleTimeoutId !== null) {
-        window.clearTimeout(bubbleTimeoutId)
-        bubbleTimeoutId = null
-      }
-
-      if (!isBubbleVisible.value) {
-        isBubbleVisible.value = true
-      }
-
-      bubbleTimeoutId = window.setTimeout(() => {
-        isBubbleVisible.value = false
-        bubbleTimeoutId = null
-      }, 2000)
-    }
-
-    if (config.audio && config.audio !== 'none') {
-      playBubbleAudio(config.audio)
-    }
-  },
-  { immediate: true },
-)
-
-// 播放情绪气泡音效（音量跟随「气泡音量」设置，否则恒为满音量）
-const playBubbleAudio = (src: string) => {
-  if (!bubbleAudio.value) return
-  bubbleAudio.value.volume = uiStore.bubbleVolume / 100
-  bubbleAudio.value.src = src
-  bubbleAudio.value.load()
-  bubbleAudio.value.play().catch((e) => console.error('气泡音效播放失败:', e))
-}
-
-// 气泡音量设置变化时，对已加载的音效实时生效
-watch(
-  () => uiStore.bubbleVolume,
-  (v) => {
-    if (bubbleAudio.value) bubbleAudio.value.volume = v / 100
-  },
-)
-
-// 思考中反馈：气泡 + 音效（由 currentStatus 驱动，与 emotion 解耦）
-watch(
-  () => gameStore.currentStatus,
-  (newStatus) => {
-    if (newStatus === 'thinking') {
-      const config = EMOTION_CONFIG['AI思考']
-      if (config && config.bubbleImage && config.bubbleImage !== 'none') {
-        currentBubbleImageUrl.value = config.bubbleImage
-        currentBubbleClass.value = config.bubbleClass
-
-        if (bubbleTimeoutId !== null) {
-          window.clearTimeout(bubbleTimeoutId)
-          bubbleTimeoutId = null
-        }
-        if (!isBubbleVisible.value) {
-          isBubbleVisible.value = true
-        }
-        bubbleTimeoutId = window.setTimeout(() => {
-          isBubbleVisible.value = false
-          bubbleTimeoutId = null
-        }, 2000)
-      }
-      if (config?.audio && config.audio !== 'none') {
-        playBubbleAudio(config.audio)
-      }
-    } else {
-      // 离开思考态：隐藏思考气泡、停掉定时器
-      isBubbleVisible.value = false
-      if (bubbleTimeoutId !== null) {
-        window.clearTimeout(bubbleTimeoutId)
-        bubbleTimeoutId = null
-      }
-    }
-  },
-)
 </script>
 
 <style scoped>

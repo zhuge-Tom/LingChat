@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
 import { createI18n } from 'vue-i18n'
-import OpenCC from 'opencc-js'
 import { useSettingsStore } from '@/stores/modules/settings'
 import zhCN from './zh-CN'
 import zhHK from './zh-HK'
@@ -112,8 +111,7 @@ async function loadLocaleMessages(locale: AppLocale) {
   }
 }
 
-// 启动时异步加载全部语言文件（加载完成前界面暂用内置词条）
-for (const opt of SUPPORTED_LOCALES) void loadLocaleMessages(opt.value)
+void loadLocaleMessages(detectLocale())
 
 /** 切换界面语言：立即生效，经统一设置 store 持久化（persist 插件自动写 localStorage） */
 export function setLocale(locale: AppLocale) {
@@ -124,7 +122,7 @@ export function setLocale(locale: AppLocale) {
   } catch (e) {
     console.warn('写入统一设置存储失败（非致命）:', e)
   }
-  // 切语言时重读语言文件，用户刚编辑的内容立即生效
+  if (locale === 'zh-HK') void ensureHkConverter()
   void loadLocaleMessages(locale)
 }
 
@@ -133,11 +131,23 @@ export function isJaLocale(): boolean {
   return globalLocale.value === 'ja'
 }
 
-/** 简→繁（港）转换器：繁体（香港）界面下把对话内容转繁体显示（仅显示层，不改数据） */
-const toHk = OpenCC.Converter({ from: 'cn', to: 'hk' })
+let toHk: ((text: string) => string) | null = null
+
+async function ensureHkConverter() {
+  if (toHk) return
+  const mod = (await import('opencc-js')) as {
+    default?: { Converter: (opts: { from: string; to: string }) => (s: string) => string }
+    Converter?: (opts: { from: string; to: string }) => (s: string) => string
+  }
+  const Converter = mod.default?.Converter ?? mod.Converter
+  if (!Converter) return
+  toHk = Converter({ from: 'cn', to: 'hk' })
+}
+
+if (detectLocale() === 'zh-HK') void ensureHkConverter()
 
 /** 繁体（香港）界面下将文本转为繁体；其他界面或空文本原样返回 */
 export function hkify<T extends string | undefined>(text: T): T {
   if (!text || globalLocale.value !== 'zh-HK') return text
-  return toHk(text) as T
+  return (toHk ? toHk(text) : text) as T
 }

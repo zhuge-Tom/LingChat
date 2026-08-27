@@ -36,6 +36,8 @@
             <div class="animate-spin w-8 h-8 border-3 border-cyan-200/20 border-t-cyan-400 rounded-full mx-auto mb-3"></div>
             <p class="text-white/80 text-sm">{{ $t('ui.lanSync.scanning') }}</p>
             <p class="text-white/40 text-xs mt-1">{{ $t('ui.lanSync.serverPort', { port: serverPort }) }}</p>
+            <p v-if="pairingPin" class="text-cyan-300 text-sm mt-3 tracking-[0.3em] font-mono">{{ pairingPin }}</p>
+            <p v-if="pairingPin" class="text-white/40 text-xs mt-1">{{ $t('ui.lanSync.pairingPinHint') }}</p>
           </div>
 
           <!-- 设备列表：获取对端清单中 -->
@@ -47,6 +49,19 @@
 
           <!-- 设备列表：结果 -->
           <div v-if="view === 'device-list' && phase !== 'scanning'" class="space-y-3">
+            <div v-if="pairingPin" class="rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+              <p class="text-white/40 text-xs">{{ $t('ui.lanSync.localPin') }}</p>
+              <p class="text-cyan-300 text-lg tracking-[0.35em] font-mono">{{ pairingPin }}</p>
+            </div>
+            <label class="block">
+              <span class="text-white/40 text-xs">{{ $t('ui.lanSync.remotePin') }}</span>
+              <input
+                :value="remotePin"
+                maxlength="8"
+                class="mt-1 w-full rounded-lg bg-black/30 border border-white/15 px-3 py-2 text-white tracking-[0.3em] uppercase"
+                @input="emit('update:remotePin', ($event.target as HTMLInputElement).value)"
+              />
+            </label>
             <div class="flex items-center justify-between">
               <span class="text-white/50 text-xs">{{ $t('ui.lanSync.peersFound', { count: peers.length }) }}</span>
               <button
@@ -273,6 +288,8 @@ const props = defineProps<{
   view: DialogView
   phase: SyncPhase
   serverPort: number
+  pairingPin: string
+  remotePin: string
   peers: PeerInfo[]
   syncPlan: SyncPlan | null
   progress: SyncProgressEvent
@@ -282,6 +299,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   rescan: []
+  'update:remotePin': [value: string]
   pull: [peer: PeerInfo]
   push: [peer: PeerInfo]
   confirm: []

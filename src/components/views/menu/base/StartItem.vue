@@ -18,6 +18,11 @@
       hover:not-disabled:text-shadow-[0_0_6px_rgba(255,255,255,0.4)]
       hover:not-disabled:-translate-y-2
       hover:not-disabled:scale-105
+      active:not-disabled:scale-95
+      active:not-disabled:translate-y-0
+      focus-visible:outline-none
+      focus-visible:not-disabled:text-[#f0f0f0]
+      focus-visible:not-disabled:text-shadow-[0_0_6px_rgba(255,255,255,0.4)]
       disabled:opacity-50
       disabled:cursor-not-allowed
       hover:disabled:text-white

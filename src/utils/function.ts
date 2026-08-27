@@ -13,7 +13,6 @@ export const convertToGameMessages = (lines: GameLine[]): GameMessage[] => {
     const isLastMessage = index === array.length - 1
     const nextLine = isLastMessage ? null : array[index + 1]
 
-    console.log('line.attribute', line.attribute)
     let isFinal = false
     if (line.attribute === 'assistant') {
       if (isLastMessage || nextLine?.attribute === 'user') {

@@ -12,7 +12,8 @@ use std::path::PathBuf;
 use axum::{
     body::Body,
     extract::{DefaultBodyLimit, Query, State as AxumState},
-    http::StatusCode,
+    http::{Request, StatusCode},
+    middleware::{from_fn_with_state, Next},
     response::{IntoResponse, Json, Response},
     routing::{get, post},
     Router,
@@ -38,6 +39,7 @@ use super::messages::{CompleteManifest, DeviceIdentity};
 struct ServerState {
     device_id: String,
     data_dir: PathBuf,
+    sync_token: String,
 }
 
 /// 全局服务关闭信号。
@@ -60,6 +62,7 @@ pub async fn start_server(
     let state = ServerState {
         device_id: identity.device_id.clone(),
         data_dir: data_dir(),
+        sync_token: identity.sync_token.clone(),
     };
 
     let router = Router::new()
@@ -70,7 +73,8 @@ pub async fn start_server(
         .route("/push-delete", post(push_delete_handler))
         .route("/db-records", get(db_records_handler))
         .route("/db-records", post(db_records_push_handler))
-        .layer(DefaultBodyLimit::disable())
+        .layer(from_fn_with_state(state.clone(), require_sync_token))
+        .layer(DefaultBodyLimit::max(512 * 1024 * 1024))
         .with_state(state);
 
     // 绑定随机端口
@@ -123,6 +127,25 @@ pub async fn stop_server() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+async fn require_sync_token(
+    AxumState(state): AxumState<ServerState>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    if request.uri().path() == "/health" {
+        return next.run(request).await;
+    }
+    let provided = request
+        .headers()
+        .get(super::messages::TOKEN_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if !super::messages::token_matches(provided, &state.sync_token) {
+        return (StatusCode::UNAUTHORIZED, "unauthorized").into_response();
+    }
+    next.run(request).await
 }
 
 // ─── 端点处理器 ──────────────────────────────────────────────

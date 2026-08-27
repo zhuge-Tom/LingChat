@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core'
-import http from '../http'
 import type { BackgroundImageInfo } from '../../types'
 
 export const getBackgroundImages = async (): Promise<BackgroundImageInfo[]> => {
@@ -15,8 +14,8 @@ export const getBackgroundImages = async (): Promise<BackgroundImageInfo[]> => {
   }
 }
 
-export const getBackgroundImageById = async (id: string): Promise<BackgroundImageInfo> => {
-  return http.get(`/backgrounds/${id}`)
+export const getBackgroundImageById = async (_id: string): Promise<BackgroundImageInfo> => {
+  throw new Error('getBackgroundImageById is no longer available')
 }
 
 export const uploadBackgroundImage = async (
@@ -26,20 +25,11 @@ export const uploadBackgroundImage = async (
   return invoke('upload_background_image', { fileName, fileData })
 }
 
-export const setCurrentBackground = async (background: string): Promise<void> => {
-  await http.post('/v1/chat/background/select', { background })
-}
+export const setCurrentBackground = async (_background: string): Promise<void> => {}
 
-export const setCurrentBackgroundEffect = async (effect: string): Promise<void> => {
-  await http.post('/v1/chat/background/effect', { effect })
-}
+export const setCurrentBackgroundEffect = async (_effect: string): Promise<void> => {}
 
-export const generateBackgroundImage = async (prompt: string, clientId: string): Promise<void> => {
-  await http.post('/v1/chat/background/generate', {
-    prompt,
-    client_id: clientId,
-  })
-}
+export const generateBackgroundImage = async (_prompt: string, _clientId: string): Promise<void> => {}
 
 export const openBackgroundsFolder = async (): Promise<void> => {
   await invoke('open_backgrounds_folder')

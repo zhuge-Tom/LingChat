@@ -7,7 +7,7 @@
 
 **LingChat - 一个灵动の人工智能聊天陪伴助手**
 
-[📥 下载最新版本](https://github.com/SlimeBoyOwO/LingChat/releases) · [🐛 报告 Bug](https://github.com/SlimeBoyOwO/LingChat/issues) · [📖 源代码使用教程](https://github.com/SlimeBoyOwO/LingChat/blob/develop/others/document/%E6%BA%90%E4%BB%A3%E7%A0%81%E4%BD%BF%E7%94%A8.md)
+[📥 下载最新版本 v0.5.1](https://github.com/SlimeBoyOwO/LingChat/releases) · [🐛 报告 Bug](https://github.com/SlimeBoyOwO/LingChat/issues) · [📖 源代码使用教程](https://github.com/SlimeBoyOwO/LingChat/blob/main/.github/CONTRIBUTING.md)
 
 </div>
 
@@ -108,15 +108,19 @@
 ### 🔧 准备工作
 
 > [!NOTE]
-> **API 申请：** 在 [DeepSeek 官方网站](https://platform.platform.com/) 或其他大模型平台申请属于你的 API 密钥，并确保账户内有余额。
+> **API 申请：** 在 [DeepSeek 官方网站](https://platform.deepseek.com/) 或其他大模型平台申请属于你的 API 密钥，并确保账户内有余额。
+>
+> **当前版本：** `v0.5.1`（性能与体验打磨：资源体积大幅下降、对话/设置 UI 玻璃拟态、局域网配对码同步）。完整说明见 [CHANGELOG](https://github.com/SlimeBoyOwO/LingChat/blob/main/CHANGELOG.md)。
 
 ### 📦 第一步：下载与安装
 
-1. 根据你的系统选择合适的版本：
-   - 💻 **Win10 64位及以上**：请下载最新版 `v0.5`。
-   - 💻 **32位或老旧机器**：请前往 [Issues #379](https://github.com/SlimeBoyOwO/LingChat/issues/379) 下载兼容版（如 `LingChat v0.4.0-pre Python3.8 win32.7z`）。
-2. 在 [Releases](https://github.com/SlimeBoyOwO/LingChat/releases) 页面下载 `LingChat vX.X.X.7z`压缩包。
-3. 安装或解压后，双击 `LingChat.exe` 运行。
+1. 打开 [Releases](https://github.com/SlimeBoyOwO/LingChat/releases) 下载对应平台安装包：
+   - 💻 **Windows 10/11 64 位**：`LingChat_0.5.1_x64-setup.exe`（安装程序）
+   - 📱 **Android**：`LingChat-v0.5.1-universal.apk`
+   - 🍎 **macOS**：`.dmg`
+   - 🐧 **Linux**：`.AppImage` / `.deb`
+   - 💻 **32 位或老旧机器**：请前往 [Issues #379](https://github.com/SlimeBoyOwO/LingChat/issues/379) 下载兼容版。
+2. Windows 运行安装程序；或安装完成后启动 `LingChat.exe`。
 
 > [!WARNING]  
 > 解压后如果发现 `LingChat.exe` 不见了，通常是被 Windows Defender 误杀了。请进入 **Windows 安全中心 -> 病毒和威胁防护** 允许该文件运行。

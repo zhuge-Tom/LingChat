@@ -9,7 +9,7 @@
       ref="imageFadeRef"
       class="game-background"
       :src="backgroundSrc"
-      position="center center"
+      position="center bottom"
       object-fit="cover"
       :duration="uiStore.currentBackgroundTransition"
     />

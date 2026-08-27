@@ -93,7 +93,13 @@ class MouseSpark {
     this.bindHandlers()
     this.initCanvas()
     this.bindEvents()
-    this.animationId = requestAnimationFrame((now) => this.animationLoops(now))
+  }
+
+  ensureAnimating() {
+    if (this.animationId == null) {
+      this.lastFrameTime = performance.now()
+      this.animationId = requestAnimationFrame((now) => this.animationLoops(now))
+    }
   }
 
   onMouseDown: (e: MouseEvent) => void = () => {}
@@ -112,6 +118,7 @@ class MouseSpark {
       this.isDown = true
       this.lastPos = getPos(e)
       this.createEffects(this.lastPos.x, this.lastPos.y)
+      this.ensureAnimating()
     }
     this.onMouseMove = (e: MouseEvent) => {
       if (!settingsStore.globalMouseTrailEnabled) return
@@ -160,6 +167,7 @@ class MouseSpark {
           spark.color = '135,206,250' // 发光蓝
           this.sparks.push(spark)
         }
+        this.ensureAnimating()
       }
       this.lastPos = p
     }
@@ -680,7 +688,7 @@ class MouseSpark {
         this._renderToMain(this.previousDirtyRects)
         this.previousDirtyRects = []
       }
-      this.animationId = requestAnimationFrame((nextNow) => this.animationLoops(nextNow))
+      this.animationId = null
       return
     }
 

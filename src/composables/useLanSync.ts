@@ -14,6 +14,8 @@ import { i18n } from '@/locales'
 
 const serverRunning = ref(false)
 const serverPort = ref(0)
+const pairingPin = ref('')
+const remotePin = ref('')
 const peers = ref<PeerInfo[]>([])
 const selectedPeer = ref<PeerInfo | null>(null)
 const phase = ref<SyncPhase>('idle')
@@ -113,10 +115,11 @@ export function useLanSync() {
   /** 启动本地同步服务 */
   async function startServer(): Promise<number> {
     try {
-      const port = await invoke<number>('lan_sync_start_server')
+      const info = await invoke<{ port: number; pairingPin: string }>('lan_sync_start_server')
       serverRunning.value = true
-      serverPort.value = port
-      return port
+      serverPort.value = info.port
+      pairingPin.value = info.pairingPin
+      return info.port
     } catch (e) {
       errorMessage.value = String(e)
       throw e
@@ -129,6 +132,7 @@ export function useLanSync() {
       await invoke('lan_sync_stop_server')
       serverRunning.value = false
       serverPort.value = 0
+      pairingPin.value = ''
     } catch (e) {
       errorMessage.value = String(e)
       throw e
@@ -153,7 +157,10 @@ export function useLanSync() {
 
   /** 选择对等设备 */
   function selectPeer(peer: PeerInfo) {
-    selectedPeer.value = peer
+    selectedPeer.value = {
+      ...peer,
+      syncToken: remotePin.value.trim() || peer.syncToken || '',
+    }
   }
 
   /** 计划拉取 */
@@ -276,6 +283,8 @@ export function useLanSync() {
     // 状态
     serverRunning,
     serverPort,
+    pairingPin,
+    remotePin,
     peers,
     selectedPeer,
     phase,

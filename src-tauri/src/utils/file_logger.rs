@@ -7,7 +7,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use chrono::Local;
 use tracing_subscriber::fmt::MakeWriter;
@@ -17,6 +17,8 @@ pub static LOG_ENABLED: AtomicBool = AtomicBool::new(true);
 
 /// 日志文件路径（setup 阶段初始化）
 static LOG_FILE_PATH: OnceLock<std::path::PathBuf> = OnceLock::new();
+/// 长驻文件句柄，避免每条日志都重新 open
+static LOG_FILE: OnceLock<Mutex<Option<File>>> = OnceLock::new();
 
 /// 日志目录（setup 阶段初始化，供清理使用）
 static LOG_DIR: OnceLock<std::path::PathBuf> = OnceLock::new();
@@ -32,9 +34,15 @@ pub fn init_logging(data_dir: &Path, enable: bool) {
     let timestamp = Local::now().format("%Y%m%d_%H%M%S");
     let log_file = log_dir.join(format!("{timestamp}.log"));
 
-    LOG_FILE_PATH.set(log_file).ok();
+    LOG_FILE_PATH.set(log_file.clone()).ok();
     LOG_DIR.set(log_dir).ok();
     LOG_ENABLED.store(enable, Ordering::Release);
+    let handle = if enable {
+        OpenOptions::new().create(true).append(true).open(&log_file).ok()
+    } else {
+        None
+    };
+    LOG_FILE.set(Mutex::new(handle)).ok();
 }
 
 /// tracing-subscriber 的 MakeWriter 实现
@@ -44,40 +52,37 @@ impl<'a> MakeWriter<'a> for LogFileWriter {
     type Writer = LogFile;
 
     fn make_writer(&'a self) -> Self::Writer {
-        if !LOG_ENABLED.load(Ordering::Acquire) {
-            return LogFile { file: None };
-        }
-        let path = match LOG_FILE_PATH.get() {
-            Some(p) => p.clone(),
-            None => return LogFile { file: None },
-        };
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)
-            .ok();
-        LogFile { file }
+        LogFile
     }
 }
 
-/// 单个日志文件句柄
-pub struct LogFile {
-    file: Option<File>,
-}
+/// 单个日志文件句柄（写入全局长驻文件）
+pub struct LogFile;
 
 impl Write for LogFile {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        match self.file.as_mut() {
-            Some(f) => f.write(buf),
-            None => Ok(buf.len()),
+        if !LOG_ENABLED.load(Ordering::Acquire) {
+            return Ok(buf.len());
         }
+        if let Some(slot) = LOG_FILE.get() {
+            if let Ok(mut guard) = slot.lock() {
+                if let Some(f) = guard.as_mut() {
+                    return f.write(buf);
+                }
+            }
+        }
+        Ok(buf.len())
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        match self.file.as_mut() {
-            Some(f) => f.flush(),
-            None => Ok(()),
+        if let Some(slot) = LOG_FILE.get() {
+            if let Ok(mut guard) = slot.lock() {
+                if let Some(f) = guard.as_mut() {
+                    return f.flush();
+                }
+            }
         }
+        Ok(())
     }
 }
 

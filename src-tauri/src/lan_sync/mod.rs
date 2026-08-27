@@ -34,7 +34,7 @@ use uuid::Uuid;
 
 use crate::api::data_dir;
 
-use self::messages::{DeviceIdentity, PeerInfo, SyncPlan, SyncResult};
+use self::messages::{DeviceIdentity, LanServerInfo, PeerInfo, SyncPlan, SyncResult};
 
 // ─── 全局状态 ────────────────────────────────────────────────
 
@@ -114,7 +114,13 @@ fn get_device_identity(state: &LanSyncState) -> Result<DeviceIdentity, String> {
     if path.exists() {
         match fs::read_to_string(&path) {
             Ok(content) => match serde_json::from_str::<DeviceIdentity>(&content) {
-                Ok(id) => {
+                Ok(mut id) => {
+                    if id.sync_token.is_empty() {
+                        id.sync_token = Uuid::new_v4().to_string();
+                        if let Ok(json) = serde_json::to_string_pretty(&id) {
+                            let _ = fs::write(&path, json);
+                        }
+                    }
                     let mut guard = state
                         .device_identity
                         .lock()
@@ -134,6 +140,7 @@ fn get_device_identity(state: &LanSyncState) -> Result<DeviceIdentity, String> {
     let identity = DeviceIdentity {
         device_id: Uuid::new_v4().to_string(),
         device_name,
+        sync_token: Uuid::new_v4().to_string(),
     };
 
     // 持久化
@@ -186,7 +193,7 @@ fn get_hostname() -> String {
 pub async fn lan_sync_start_server(
     app: AppHandle,
     state: State<'_, LanSyncState>,
-) -> Result<u16, String> {
+) -> Result<LanServerInfo, String> {
     // 并发检查
     {
         let mut running = state
@@ -217,7 +224,10 @@ pub async fn lan_sync_start_server(
         port,
         &instance_id[..8]
     );
-    Ok(port)
+    Ok(LanServerInfo {
+        port,
+        pairing_pin: messages::pairing_pin(&identity.sync_token),
+    })
 }
 
 /// 停止本地 HTTP 同步服务。

@@ -40,21 +40,23 @@ export function useDialogAppearance(options: UseDialogAppearanceOptions) {
   // ── 样式计算 ──
   const dialogWrapperStyle = computed(() => {
     const hasImage = Boolean(dialogBgImage.value)
+    const radius = `${Math.max(0, dialogBorderRadius.value)}px`
     const style: Record<string, string> = {
       color: dialogTextColorValue.value,
+      borderTopLeftRadius: radius,
+      borderTopRightRadius: radius,
+      boxShadow: '0 -12px 40px rgba(0, 0, 0, 0.28)',
     }
 
     if (hasImage) {
-      // 使用用户自定义图片
       style.backgroundImage = `url(${dialogBgImage.value})`
       style.backgroundSize = 'cover'
       style.backgroundPosition = 'center'
       style.backdropFilter = `blur(${dialogBlur.value}px)`
       style.backgroundColor = 'rgba(0,0,0,0.2)'
     } else {
-      // 使用纯渐变色
-      style.background = `linear-gradient(to top, ${hexToRgba(dialogGradientColor.value, dialogOpacity.value)}, ${hexToRgba(dialogGradientColor.value, Math.max(0, dialogOpacity.value - 0.1))})`
-      style.backdropFilter = 'none'
+      style.background = `linear-gradient(to top, ${hexToRgba(dialogGradientColor.value, dialogOpacity.value)}, ${hexToRgba(dialogGradientColor.value, Math.max(0, dialogOpacity.value - 0.18))})`
+      style.backdropFilter = `blur(${Math.max(2, dialogBlur.value)}px)`
     }
 
     return style

@@ -1,17 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
-import http from '../http'
-import type { Character, CharacterSelectParams } from '../../types'
+import type { Character } from '../../types'
 import type { WebInitData } from './game-info'
 import { i18n } from '@/locales'
-
-interface CharacterSelectResponse {
-  success: boolean
-  character: {
-    id: number
-    title: string
-    folder_name: string
-  }
-}
 
 export interface CharacterPageResult {
   items: Character[]
@@ -30,17 +20,6 @@ export const characterGetAll = async (
     return data as CharacterPageResult
   } catch (error: any) {
     throw new Error(typeof error === 'string' ? error : i18n.global.t('api.character.getListFailed'))
-  }
-}
-
-export const characterSelect = async (
-  params: CharacterSelectParams,
-): Promise<CharacterSelectResponse> => {
-  try {
-    const response = await http.post('/v1/chat/character/select_character', params)
-    return response
-  } catch (error: any) {
-    throw new Error(error.response?.data?.detail || i18n.global.t('api.character.selectFailed'))
   }
 }
 
@@ -76,7 +55,6 @@ export interface RoleInfo {
 export const getRoleInfo = async (roleId: number): Promise<RoleInfo> => {
   try {
     const data = await invoke('get_role_info', { roleId })
-    console.log('获取角色信息成功', data)
     return data as RoleInfo
   } catch (error: any) {
     console.error('获取游戏角色信息错误:', typeof error === 'string' ? error : error.message)
@@ -109,12 +87,17 @@ export interface CreateCharacterResponse {
   }
 }
 
-export const createCharacter = async (formData: FormData): Promise<CreateCharacterResponse> => {
+export const createCharacter = async (payload: {
+  resourceFolder: string
+  settingsJson: string
+  avatarFileName: string
+  avatarData: Uint8Array
+  emotions: { name: string; fileName: string; data: Uint8Array }[]
+}): Promise<CreateCharacterResponse> => {
   try {
-    const response = await http.post('/v1/chat/character/create', formData)
-    return response
+    return await invoke<CreateCharacterResponse>('create_character', payload)
   } catch (error: any) {
-    throw new Error(error.response?.data?.detail || i18n.global.t('api.character.createFailed'))
+    throw new Error(typeof error === 'string' ? error : i18n.global.t('api.character.createFailed'))
   }
 }
 
@@ -129,7 +112,6 @@ export const selectClothes = async (
 ): Promise<SelectClothesResponse> => {
   try {
     const data = await invoke('select_clothes', { roleId, clothesName })
-    console.log(data)
     return data as SelectClothesResponse
   } catch (error: any) {
     throw new Error(typeof error === 'string' ? error : i18n.global.t('api.character.selectClothesFailed'))

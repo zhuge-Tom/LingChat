@@ -86,11 +86,9 @@ impl LocalTtsEngine {
             .await
             .map_err(|e| format!("read tokenizer: {e}"))?;
 
-        let bert_clone = bert.clone();
-        let tok_clone = tok.clone();
         let device = *self.device.lock().await;
         let holder = tokio::task::spawn_blocking(move || {
-            TTSModelHolder::new_with_device(bert_clone, tok_clone, Some(4), device)
+            TTSModelHolder::new_with_device(bert, tok, Some(4), device)
         })
         .await
         .map_err(|e| format!("join: {e}"))?

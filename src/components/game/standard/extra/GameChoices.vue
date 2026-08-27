@@ -86,7 +86,7 @@
           ></div>
         </div>
         <span
-          class="text-lg font-medium text-white group-hover:text-white tracking-widest text-center block drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
+          class="text-xl font-bold text-white group-hover:text-white tracking-widest text-center block drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
         >
           {{ choice.text }}
         </span>

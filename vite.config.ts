@@ -7,8 +7,8 @@ import tailwindcss from '@tailwindcss/vite'
 const host = process.env.TAURI_DEV_HOST
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
-  plugins: [vue(), VueDevTools(), tailwindcss()],
+export default defineConfig(async ({ command }) => ({
+  plugins: [vue(), ...(command === 'serve' ? [VueDevTools()] : []), tailwindcss()],
 
   resolve: {
     alias: {
@@ -38,11 +38,23 @@ export default defineConfig(async () => ({
     },
   },
 
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/vue/') || id.includes('node_modules/@vue/')) return 'vue'
+          if (id.includes('vue-i18n') || id.includes('@intlify')) return 'i18n'
+          if (id.includes('opencc-js')) return 'opencc'
+          if (id.includes('lucide-vue-next')) return 'icons'
+          if (id.includes('marked')) return 'marked'
+          if (id.includes('cropperjs')) return 'cropper'
+        },
+      },
+    },
+  },
+
   // 依赖优化配置
   optimizeDeps: {
     exclude: ['src-tauri/*'],
-    entries: [
-      'src/*'
-    ],
   },
 }))

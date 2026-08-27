@@ -38,6 +38,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useGameStore } from '@/stores/modules/game'
 import { invoke } from '@tauri-apps/api/core'
 import { eventQueue } from '@/core/events/event-queue'
+import { spriteBoostFor } from '@/constants/sprite'
 
 interface BodyPart {
   X: number[]
@@ -134,7 +135,8 @@ watch(
 // 计算单个 bodyPart 的多边形坐标点
 const getPolygonPoints = (part: BodyPart): string => {
   // bodyPart 需跟随人物移动，PC端横向分辨率变化不会使人物缩放
-  const scale = windowHeight.value / part.windowHeight
+  // 立绘经过 spriteBoostFor 整体放大（见 constants/sprite.ts），热区同步放大保持对齐
+  const scale = (windowHeight.value / part.windowHeight) * spriteBoostFor(windowWidth.value / windowHeight.value)
   const centerX = windowWidth.value / 2
   const centerY = windowHeight.value / 2
   const originalCenterX = part.windowWidth / 2

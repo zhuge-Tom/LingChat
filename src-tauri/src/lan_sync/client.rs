@@ -10,7 +10,15 @@ use reqwest::Client;
 use tokio_util::io::ReaderStream;
 use tracing::info;
 
-use super::messages::{CompleteManifest, PeerInfo};
+use super::messages::{CompleteManifest, PeerInfo, TOKEN_HEADER};
+
+fn with_token(req: reqwest::RequestBuilder, peer: &PeerInfo) -> reqwest::RequestBuilder {
+    if peer.sync_token.is_empty() {
+        req
+    } else {
+        req.header(TOKEN_HEADER, &peer.sync_token)
+    }
+}
 
 /// 全模块共享的 HTTP 客户端（连接池复用 + Keep-Alive）。
 static HTTP_CLIENT: LazyLock<Client> = LazyLock::new(|| {
@@ -30,8 +38,7 @@ pub async fn fetch_remote_manifest(peer: &PeerInfo) -> Result<CompleteManifest, 
 
     let client = &*HTTP_CLIENT;
 
-    let response = client
-        .get(&url)
+    let response = with_token(client.get(&url), peer)
         .send()
         .await
         .map_err(|e| format!("请求清单失败 [{}:{}]: {}", peer.host, peer.port, e))?;
@@ -95,13 +102,19 @@ pub async fn download_file(
         peer.port,
         urlencoding(remote_path)
     );
-    crate::utils::download::download_to_file(
+    let headers: Vec<(&str, &str)> = if peer.sync_token.is_empty() {
+        Vec::new()
+    } else {
+        vec![(TOKEN_HEADER, peer.sync_token.as_str())]
+    };
+    crate::utils::download::download_to_file_with_headers(
         &HTTP_CLIENT,
         &url,
         dest_path,
         None,
         None,
         0,
+        &headers,
     )
     .await
     .map_err(|e| format!("[{}]: {e}", remote_path))?;
@@ -139,9 +152,7 @@ pub async fn upload_file(
     let stream = ReaderStream::new(file);
     let body = reqwest::Body::wrap_stream(stream);
 
-    let response = client
-        .post(&url)
-        .body(body)
+    let response = with_token(client.post(&url).body(body), peer)
         .send()
         .await
         .map_err(|e| format!("推送文件失败 [{}]: {e}", remote_path))?;
@@ -168,8 +179,7 @@ pub async fn push_delete(peer: &PeerInfo, remote_path: &str) -> Result<(), Strin
     );
     let client = &*HTTP_CLIENT;
 
-    let response = client
-        .post(&url)
+    let response = with_token(client.post(&url), peer)
         .send()
         .await
         .map_err(|e| format!("发送删除指令失败 [{}]: {e}", remote_path))?;
@@ -194,8 +204,7 @@ pub async fn fetch_db_records(
 
     let client = &*HTTP_CLIENT;
 
-    let response = client
-        .get(&url)
+    let response = with_token(client.get(&url), peer)
         .send()
         .await
         .map_err(|e| format!("请求数据库记录失败 [{}:{}]: {}", peer.host, peer.port, e))?;
@@ -242,9 +251,7 @@ pub async fn push_db_records(
 
     let client = &*HTTP_CLIENT;
 
-    let response = client
-        .post(&url)
-        .json(records)
+    let response = with_token(client.post(&url).json(records), peer)
         .send()
         .await
         .map_err(|e| format!("推送数据库记录失败 [{}:{}]: {}", peer.host, peer.port, e))?;

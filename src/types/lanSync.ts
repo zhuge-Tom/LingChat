@@ -8,6 +8,7 @@ export interface PeerInfo {
   port: number
   dataVersion: number
   fileCount: number
+  syncToken?: string
 }
 
 /** 同步文件操作 */

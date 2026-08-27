@@ -690,11 +690,8 @@ const submitCreate = async () => {
       system_prompt_example_old: form.system_prompt_example_old.trim() || null,
     }
 
-    const formData = new FormData()
-    formData.append('resource_folder', form.resource_folder.trim())
-    formData.append('settings_json', JSON.stringify(settingsPayload))
-    formData.append('avatar_file', avatarFile.value)
-
+    const toBytes = async (file: File) => new Uint8Array(await file.arrayBuffer())
+    const emotions = []
     for (const emotion of EMOTION_SLOTS) {
       const emotionFile = emotionFiles[emotion]
       if (!emotionFile) {
@@ -702,11 +699,20 @@ const submitCreate = async () => {
           t('settings.characterCreate.errors.missingEmotionFile', { name: emotionLabel(emotion) }),
         )
       }
-      formData.append('emotion_names', emotion)
-      formData.append('emotion_files', emotionFile)
+      emotions.push({
+        name: emotion,
+        fileName: emotionFile.name,
+        data: await toBytes(emotionFile),
+      })
     }
 
-    const response = await createCharacter(formData)
+    const response = await createCharacter({
+      resourceFolder: form.resource_folder.trim(),
+      settingsJson: JSON.stringify(settingsPayload),
+      avatarFileName: avatarFile.value.name,
+      avatarData: await toBytes(avatarFile.value),
+      emotions,
+    })
     emit('created', response.data)
     emit('close')
   } catch (error: any) {

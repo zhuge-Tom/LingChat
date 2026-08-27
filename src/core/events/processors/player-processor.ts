@@ -30,5 +30,6 @@ export default class PlayerProcessor implements IEventProcessor {
     uiStore.showCharacterSubtitle = displaySubtitle
     uiStore.showCharacterLine = event.text
     uiStore.showCharacterEmotion = event.emotion ? event.emotion : ''
+    uiStore.isNarrationLine = false
   }
 }

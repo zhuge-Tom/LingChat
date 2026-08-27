@@ -30,6 +30,11 @@ interface UIState {
   showCharacterEmotion: string
   showCharacterLine: string
   showCharacterMotionText: string
+  /** 当前台词是否为剧本旁白（narration），用于对话框的电影化样式 */
+  isNarrationLine: boolean
+  /** 全屏章节卡：文本 + 序号（序号递增用于重复章节名的重新触发） */
+  chapterCardText: string
+  chapterCardSeq: number
   showPlayerHintLine: string
   showCharacterThinkLine: string
   showSettings: boolean
@@ -101,6 +106,9 @@ export const useUIStore = defineStore('ui', {
     showCharacterEmotion: '',
     showCharacterLine: '',
     showCharacterMotionText: '',
+    isNarrationLine: false,
+    chapterCardText: '',
+    chapterCardSeq: 0,
     showPlayerHintLine: '',
     showCharacterThinkLine: 'Ling Ling Thinking...',
     showSettings: false,

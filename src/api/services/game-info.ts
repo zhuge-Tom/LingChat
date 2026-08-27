@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 import type { SceneInfo } from './scene'
 
 // 1. 定义角色配置接口 (原先摊平的字段现在归属到这里)
@@ -72,7 +72,6 @@ export interface WebInitData {
 export const getGameInfo = async (): Promise<WebInitData> => {
   try {
     const data = await invoke<WebInitData>('init_game')
-    console.log('获取初始化信息成功:', data)
     return data
   } catch (error: any) {
     console.error('获取初始化信息错误:', typeof error === 'string' ? error : error.message)
@@ -83,7 +82,6 @@ export const getGameInfo = async (): Promise<WebInitData> => {
 export const reactivateTTS = async (): Promise<void> => {
   try {
     await invoke('reactivate_tts')
-    console.log('成功重启TTS服务')
   } catch (error: any) {
     console.error('TTS服务重启错误:', typeof error === 'string' ? error : error.message)
     throw error
@@ -93,7 +91,6 @@ export const reactivateTTS = async (): Promise<void> => {
 export const clearTtsCache = async (): Promise<{ success: boolean; message: string; deleted: number; failed: number; orphan_files_before?: number; orphan_size_before?: number }> => {
   try {
     const result = await invoke<{ success: boolean; message: string; deleted: number; failed: number; orphan_files_before?: number; orphan_size_before?: number }>('clear_tts_cache')
-    console.log('清理TTS缓存成功:', result)
     return result
   } catch (error: any) {
     console.error('清理TTS缓存错误:', typeof error === 'string' ? error : error.message)
@@ -102,8 +99,12 @@ export const clearTtsCache = async (): Promise<{ success: boolean; message: stri
 }
 
 /**
- * 获取 TTS 生成的语音文件，返回 base64 data URL
+ * 获取 TTS 语音的可播放 URL（本地文件走 asset 协议，避免 base64）
  */
 export const getVoiceAudio = async (fileName: string): Promise<string> => {
-  return await invoke<string>('get_voice_audio', { fileName })
+  const path = await invoke<string>('get_voice_audio', { fileName })
+  if (!path || path.startsWith('data:') || path.startsWith('http') || path.startsWith('asset:')) {
+    return path
+  }
+  return convertFileSrc(path)
 }

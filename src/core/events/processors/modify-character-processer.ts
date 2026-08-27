@@ -10,7 +10,6 @@ export default class ModifyCharacterProcessor implements IEventProcessor {
   async processEvent(event: ScriptModifyCharacterEvent): Promise<void> {
     const gameStore = useGameStore()
 
-    console.log('执行修改角色' + event.characterId + event.emotion + event.action)
     const delay = event.duration
 
     gameStore.currentStatus = 'presenting'

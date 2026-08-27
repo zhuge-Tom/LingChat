@@ -56,6 +56,7 @@ pub struct EmotionClassifier {
     cls_id: i64,
     sep_id: i64,
     pad_id: i64,
+    input_names: Vec<String>,
 }
 
 impl EmotionClassifier {
@@ -71,6 +72,7 @@ impl EmotionClassifier {
             cls_id: 101,
             sep_id: 102,
             pad_id: 0,
+            input_names: Vec::new(),
         }
     }
 
@@ -128,6 +130,12 @@ impl EmotionClassifier {
             })
             .collect::<Result<_>>()?;
 
+        let input_names: Vec<String> = session
+            .inputs()
+            .iter()
+            .map(|o| o.name().to_string())
+            .collect();
+
         tracing::info!(
             "已加载情绪分类模型: {} (标签数={})",
             onnx_path.display(),
@@ -146,6 +154,7 @@ impl EmotionClassifier {
             cls_id,
             sep_id,
             pad_id,
+            input_names,
         })
     }
 
@@ -210,11 +219,15 @@ impl EmotionClassifier {
             Tensor::from_array(([1i64, MAX_SEQ_LEN as i64], mask_f32.into_boxed_slice()))
                 .context("创建 attention_mask tensor 失败")?;
 
-        let input_names: Vec<String> = session
-            .inputs()
-            .iter()
-            .map(|o| o.name().to_string())
-            .collect();
+        let input_names = if self.input_names.len() >= 2 {
+            self.input_names.clone()
+        } else {
+            session
+                .inputs()
+                .iter()
+                .map(|o| o.name().to_string())
+                .collect()
+        };
 
         let outputs = session
             .run(ort::inputs![

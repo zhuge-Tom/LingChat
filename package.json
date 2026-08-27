@@ -1,12 +1,15 @@
 {
   "name": "ling-chat",
   "private": false,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "scripts": {
     "init": "tauri icon src-tauri/icons/icon.png && node scripts/prepare-desktop-resources.mjs && node scripts/download_emotion_model.mjs",
     "dev": "vite",
     "build": "vue-tsc --noEmit --skipLibCheck && vite build",
+    "typecheck": "vue-tsc --noEmit --skipLibCheck",
+    "lint": "vue-tsc --noEmit --skipLibCheck",
+    "test": "node --experimental-strip-types --test src/constants/sprite.test.ts src/stores/plugins/persist.test.ts src/controllers/emotion/config.test.ts src/composables/useDialogHistory.test.ts src/utils/inlineMotionHtml.test.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "android:prepare": "tauri android init && node scripts/generate-android-icons.mjs",
@@ -14,7 +17,6 @@
     "android:build": "node scripts/prepare-bundled-resources.mjs 9 && tauri android build --target aarch64"
   },
   "dependencies": {
-    "7zip-min": "^3.0.1",
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.2",
@@ -23,7 +25,6 @@
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-process": "^2",
     "@tauri-apps/plugin-updater": "^2",
-    "axios": "^1.16.0",
     "cropperjs": "^1.6.2",
     "lucide-vue-next": "^1.0.0",
     "marked": "^18.0.7",
@@ -36,6 +37,7 @@
     "vue-router": "^5.0.6"
   },
   "devDependencies": {
+    "7zip-min": "^3.0.1",
     "@tauri-apps/cli": "^2",
     "@types/node": "^25.7.0",
     "@vitejs/plugin-vue": "^5.2.1",

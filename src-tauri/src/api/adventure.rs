@@ -3,6 +3,7 @@
 //! Replaces Python's `/v1/chat/adventure/*` HTTP endpoints.
 //! Frontend calls these via `invoke()` instead of HTTP.
 
+use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 
 use serde::Serialize;
@@ -12,6 +13,7 @@ use crate::adventures::manager::AdventureManager;
 use crate::adventures::trigger::{self, UnlockedAdventureInfo};
 use crate::ai_service::game_system::script_engine::events::ScriptContext;
 use crate::ai_service::game_system::script_engine::ScriptManager;
+use crate::ai_service::types::ScriptStatus;
 use crate::AppState;
 
 // ============================================================
@@ -32,6 +34,86 @@ pub struct AdventureInfo {
     pub unlock_conditions: Vec<serde_json::Value>,
 }
 
+struct AdventureSnap {
+    folder_key: String,
+    name: String,
+    description: String,
+    recommand_start: String,
+    order: i32,
+    unlock_conditions: Vec<serde_json::Value>,
+    bound_character_folder: String,
+    path_key: String,
+}
+
+fn snapshot_adventures(adventures: &[&ScriptStatus]) -> Vec<AdventureSnap> {
+    adventures
+        .iter()
+        .map(|adv| AdventureSnap {
+            folder_key: adv.folder_key.clone(),
+            name: adv.name.clone(),
+            description: adv.description.clone(),
+            recommand_start: adv.recommand_start.clone(),
+            order: adv.adventure.order,
+            unlock_conditions: adv.adventure.unlock_conditions.clone(),
+            bound_character_folder: adv.adventure.bound_character_folder.clone(),
+            path_key: adv.path_key(),
+        })
+        .collect()
+}
+
+async fn build_adventure_infos(
+    db: &sea_orm::DatabaseConnection,
+    snaps: Vec<AdventureSnap>,
+    is_running: bool,
+    current_script_folder: Option<String>,
+    completed: &HashSet<String>,
+) -> Vec<AdventureInfo> {
+    let keys: Vec<String> = snaps.iter().map(|s| s.folder_key.clone()).collect();
+    let mut unlocked = AdventureManager::unlocked_set(db, &keys)
+        .await
+        .unwrap_or_default();
+
+    for snap in &snaps {
+        if snap.unlock_conditions.is_empty() && !unlocked.contains(&snap.folder_key) {
+            let _ = AdventureManager::unlock_adventure(
+                db,
+                &snap.folder_key,
+                &snap.bound_character_folder,
+            )
+            .await;
+            unlocked.insert(snap.folder_key.clone());
+        }
+    }
+
+    let mut result = Vec::new();
+    for snap in snaps {
+        let status = if completed.contains(&snap.path_key) {
+            "completed"
+        } else if is_running && current_script_folder.as_deref() == Some(&snap.folder_key) {
+            "in_progress"
+        } else if unlocked.contains(&snap.folder_key) {
+            "unlocked"
+        } else {
+            "locked"
+        };
+
+        result.push(AdventureInfo {
+            adventure_folder: snap.folder_key,
+            name: snap.name,
+            description: snap.description,
+            recommand_start: snap.recommand_start,
+            order: snap.order,
+            status: status.to_string(),
+            unlocked_at: None,
+            completed_at: None,
+            unlock_conditions: snap.unlock_conditions,
+        });
+    }
+
+    result.sort_by_key(|a| a.order);
+    result
+}
+
 // ============================================================
 // Tauri commands
 // ============================================================
@@ -44,63 +126,21 @@ pub async fn list_character_adventures(
 ) -> Result<Vec<AdventureInfo>, String> {
     let state = app.state::<AppState>();
     let db = &state.db;
-    let service = state.ai_service.lock().await;
 
-    let adventures: Vec<&crate::ai_service::types::ScriptStatus> = service
-        .script_manager
-        .get_character_adventures(&character_folder)
-        .into_iter()
-        .collect();
+    let (snaps, is_running, current_script_folder, completed) = {
+        let service = state.ai_service.lock().await;
+        let adventures = service
+            .script_manager
+            .get_character_adventures(&character_folder);
+        let snaps = snapshot_adventures(&adventures);
+        let is_running = service.script_manager.is_running.load(Ordering::Relaxed);
+        let gs = service.game_status.lock().await;
+        let current_script_folder = gs.script_status.as_ref().map(|ss| ss.folder_key.clone());
+        let completed = gs.completed_scripts.clone();
+        (snaps, is_running, current_script_folder, completed)
+    };
 
-    // Auto-unlock adventures with no conditions (empty conditions = default unlocked)
-    for adv in &adventures {
-        if adv.adventure.unlock_conditions.is_empty() {
-            let _ = AdventureManager::unlock_adventure(
-                db,
-                &adv.folder_key,
-                &adv.adventure.bound_character_folder,
-            )
-            .await;
-        }
-    }
-
-    let is_running = service.script_manager.is_running.load(Ordering::Relaxed);
-    let gs = service.game_status.lock().await;
-    let current_script_folder = gs.script_status.as_ref().map(|ss| ss.folder_key.clone());
-    let completed = &gs.completed_scripts;
-
-    let mut result = Vec::new();
-    for adv in adventures {
-        let is_unlocked = AdventureManager::is_unlocked(db, &adv.folder_key)
-            .await
-            .unwrap_or(false);
-
-        let status = if completed.contains(&adv.path_key()) {
-            "completed"
-        } else if is_running && current_script_folder.as_deref() == Some(&adv.folder_key) {
-            "in_progress"
-        } else if is_unlocked {
-            "unlocked"
-        } else {
-            "locked"
-        };
-
-        result.push(AdventureInfo {
-            adventure_folder: adv.folder_key.clone(),
-            name: adv.name.clone(),
-            description: adv.description.clone(),
-            recommand_start: adv.recommand_start.clone(),
-            order: adv.adventure.order,
-            status: status.to_string(),
-            unlocked_at: None,
-            completed_at: None,
-            unlock_conditions: adv.adventure.unlock_conditions.clone(),
-        });
-    }
-
-    // Sort by order
-    result.sort_by_key(|a| a.order);
-    Ok(result)
+    Ok(build_adventure_infos(db, snaps, is_running, current_script_folder, &completed).await)
 }
 
 /// 获取所有羁绊冒险（含解锁状态）
@@ -108,61 +148,19 @@ pub async fn list_character_adventures(
 pub async fn list_all_adventures(app: AppHandle) -> Result<Vec<AdventureInfo>, String> {
     let state = app.state::<AppState>();
     let db = &state.db;
-    let service = state.ai_service.lock().await;
 
-    let adventures: Vec<&crate::ai_service::types::ScriptStatus> = service
-        .script_manager
-        .get_all_adventures()
-        .into_iter()
-        .collect();
+    let (snaps, is_running, current_script_folder, completed) = {
+        let service = state.ai_service.lock().await;
+        let adventures = service.script_manager.get_all_adventures();
+        let snaps = snapshot_adventures(&adventures);
+        let is_running = service.script_manager.is_running.load(Ordering::Relaxed);
+        let gs = service.game_status.lock().await;
+        let current_script_folder = gs.script_status.as_ref().map(|ss| ss.folder_key.clone());
+        let completed = gs.completed_scripts.clone();
+        (snaps, is_running, current_script_folder, completed)
+    };
 
-    // Auto-unlock adventures with no conditions (empty conditions = default unlocked)
-    for adv in &adventures {
-        if adv.adventure.unlock_conditions.is_empty() {
-            let _ = AdventureManager::unlock_adventure(
-                db,
-                &adv.folder_key,
-                &adv.adventure.bound_character_folder,
-            )
-            .await;
-        }
-    }
-
-    let is_running = service.script_manager.is_running.load(Ordering::Relaxed);
-    let gs = service.game_status.lock().await;
-    let current_script_folder = gs.script_status.as_ref().map(|ss| ss.folder_key.clone());
-    let completed = &gs.completed_scripts;
-
-    let mut result = Vec::new();
-    for adv in adventures {
-        let is_unlocked = AdventureManager::is_unlocked(db, &adv.folder_key)
-            .await
-            .unwrap_or(false);
-
-        let status = if completed.contains(&adv.path_key()) {
-            "completed"
-        } else if is_running && current_script_folder.as_deref() == Some(&adv.folder_key) {
-            "in_progress"
-        } else if is_unlocked {
-            "unlocked"
-        } else {
-            "locked"
-        };
-
-        result.push(AdventureInfo {
-            adventure_folder: adv.folder_key.clone(),
-            name: adv.name.clone(),
-            description: adv.description.clone(),
-            recommand_start: adv.recommand_start.clone(),
-            order: adv.adventure.order,
-            status: status.to_string(),
-            unlocked_at: None,
-            completed_at: None,
-            unlock_conditions: adv.adventure.unlock_conditions.clone(),
-        });
-    }
-
-    Ok(result)
+    Ok(build_adventure_infos(db, snaps, is_running, current_script_folder, &completed).await)
 }
 
 /// 启动指定羁绊冒险
@@ -282,6 +280,7 @@ pub async fn check_adventure_unlocks(app: AppHandle) -> Result<Vec<UnlockedAdven
         }
 
         let result = trigger::check_all_adventures(db, &ach_mgr, &game_status, &adventures)
+            .await
             .map_err(|e| format!("检测冒险解锁失败: {}", e))?;
         result
     };
@@ -402,7 +401,9 @@ pub(crate) async fn handle_adventure_completion(
             .collect();
         let gs = service.game_status.lock().await;
         let ach_mgr = achievement_manager.lock().await;
-        trigger::check_all_adventures(db, &ach_mgr, &gs, &adventures).unwrap_or_default()
+        trigger::check_all_adventures(db, &ach_mgr, &gs, &adventures)
+            .await
+            .unwrap_or_default()
     };
 
     for info in &newly_unlocked {

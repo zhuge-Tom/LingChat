@@ -182,7 +182,7 @@ impl std::ops::Deref for AppState {
             if let Some(inner) = self.inner.get() {
                 return inner;
             }
-            std::hint::spin_loop();
+            std::thread::sleep(std::time::Duration::from_millis(2));
         }
     }
 }
@@ -258,11 +258,12 @@ pub fn run() {
             // 就会 panic "state() called before manage()"。所以 setup 一开始就 manage
             // 一个空壳 AppState，init::initialize 完成后用真实值 fill。
             app.manage(AppState::empty());
-            let rt = tokio::runtime::Runtime::new()?;
             // 本地 TTS（SBV2 进程内实现）：解析路径、注册 State/开关并收敛运行时。
             let local_tts = ai_service::tts::local::setup::bootstrap(app)?;
-            let (db, ai_service, chat) =
-                rt.block_on(init::initialize(app, Some(local_tts.runtime.clone())))?;
+            let (db, ai_service, chat) = tauri::async_runtime::block_on(init::initialize(
+                app,
+                Some(local_tts.runtime.clone()),
+            ))?;
 
             // 初始化文件日志（从设置读取开关和保留天数）
             {
@@ -293,7 +294,7 @@ pub fn run() {
             }
 
             // 启动时自动清理未被引用的孤立语音文件
-            match rt.block_on(init::voice_cleanup::cleanup_orphan_voice_files(
+            match tauri::async_runtime::block_on(init::voice_cleanup::cleanup_orphan_voice_files(
                 &db,
                 app.handle(),
             )) {
@@ -312,8 +313,9 @@ pub fn run() {
 
             // 创建生成锁
             let generation_lock = std::sync::Arc::new(tokio::sync::Mutex::new(()));
-            let role_names = rt
-                .block_on(db::managers::role_repo::RoleRepo::get_all_tool_role_names(&db))?;
+            let role_names = tauri::async_runtime::block_on(
+                db::managers::role_repo::RoleRepo::get_all_tool_role_names(&db),
+            )?;
             let tool_settings = ai_service::tools::settings::SharedToolSettings::new(
                 ai_service::tools::settings::ToolSettings::load_or_create(&api::data_dir())?,
             );
@@ -570,6 +572,7 @@ pub fn run() {
             api::character::select_clothes,
             api::character::update_role_settings,
             api::character::delete_character,
+            api::character::create_character,
             api::character::open_characters_folder,
             api::background::get_background_list,
             api::background::get_background_file,
@@ -591,7 +594,6 @@ pub fn run() {
             api::ambient::upload_ambient,
             api::ambient::delete_ambient,
             api::ambient::save_ambient_state,
-            api::asset::get_asset_base64,
             api::asset::get_voice_audio,
             api::game::init_game,
             api::game::select_character,

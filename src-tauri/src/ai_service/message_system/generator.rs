@@ -660,7 +660,7 @@ pub(crate) async fn consume_sentence(
     }
 
     // 1. 解析情绪分段
-    let mut segments = parse_segments(deps, &sentence);
+    let mut segments = parse_segments(deps, &sentence).await;
     if segments.is_empty() {
         return Ok(None);
     }
@@ -688,10 +688,11 @@ pub(crate) async fn consume_sentence(
 }
 
 /// Step A: 解析并分类情绪片段。
-fn parse_segments(deps: &SentenceDeps, sentence: &str) -> Vec<EmotionSegment> {
+async fn parse_segments(deps: &SentenceDeps, sentence: &str) -> Vec<EmotionSegment> {
     let segments = deps
         .processor
-        .parse_and_classify_emotional_segments(sentence);
+        .parse_and_classify_emotional_segments(sentence)
+        .await;
     if segments.is_empty() {
         tracing::warn!("AI 回复格式错误（未找到情绪 tag）");
     }

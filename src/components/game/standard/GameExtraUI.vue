@@ -4,6 +4,9 @@
     <!-- 1. 章节名称显示区域 -->
     <ChapterNameDisplay />
 
+    <!-- 1.5 全屏章节卡（章节切换时的一次性过场动画） -->
+    <ChapterCardDisplay />
+
     <!-- 2. Galgame 选项显示区域 -->
     <GameChoices />
 
@@ -23,6 +26,7 @@
 
 <script setup lang="ts">
 import ChapterNameDisplay from './extra/ChapterNameDisplay.vue'
+import ChapterCardDisplay from './extra/ChapterCardDisplay.vue'
 import GameChoices from './extra/GameChoices.vue'
 import ScriptCompleteDisplay from './extra/ScriptCompleteDisplay.vue'
 import ScriptPicDisplay from './extra/ScriptPicDisplay.vue'

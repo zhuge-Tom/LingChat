@@ -136,6 +136,8 @@ export class TypeWriter {
 
     this._status = 'typing'
     this.textBuffer = ''
+    // 清除上次 finish() 写入的内联 border-right，让打字光标样式（如 .typing-caret-border）重新生效
+    this.element.style.removeProperty('border-right')
 
     // Parse speed
     if (speed !== undefined) {

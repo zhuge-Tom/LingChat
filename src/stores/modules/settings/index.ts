@@ -39,7 +39,7 @@ export const DEFAULT_SETTINGS = {
     meteorFps: 30, // 流星动画帧率
     starsFps: 30, // 星星动画帧率
     sceneAwarenessEnabled: true, // 场景感知开关
-    locale: 'zh-CN', // 界面显示语言（i18n，'zh-CN' / 'ja'）
+    locale: 'zh-CN', // 界面显示语言（i18n：zh-CN / zh-HK / ja / en）
     // 对话框外观（自定义）
     dialogBackgroundImage: '', // 自定义背景图 base64/dataURL；空字符串=无图
     dialogOpacity: 0.7, // 背景透明度（0-1）
@@ -220,6 +220,8 @@ export const useSettingsStore = defineStore('settings', {
         this.text = { ...DEFAULT_SETTINGS.text }
         this.audio = { ...DEFAULT_SETTINGS.audio }
         this.display = { ...DEFAULT_SETTINGS.display }
+        this.character = { ...DEFAULT_SETTINGS.character }
+        this.pet = { ...DEFAULT_SETTINGS.pet }
         this.shortcuts = { ...DEFAULT_SETTINGS.shortcuts }
       } else {
         const keys = path.split('.')

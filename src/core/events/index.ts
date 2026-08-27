@@ -18,7 +18,6 @@ export async function initializeEventProcessors() {
       try {
         const processorInstance = new ProcessorClass() as IEventProcessor
         eventProcessorManager.registerProcessor(processorInstance)
-        console.log(`✅ Registered processor from: ${path}`)
       } catch (error) {
         console.error(`❌ Failed to instantiate processor from ${path}:`, error)
       }

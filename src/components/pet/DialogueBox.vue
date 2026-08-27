@@ -26,6 +26,7 @@
       <div
         ref="textareaRef"
         class="text-[calc(15px*var(--pet-ui-scale,1))] leading-snug font-medium overflow-y-auto whitespace-pre-line [text-shadow:0_0_3px_rgba(0,0,0,0.9),0_1px_4px_rgba(0,0,0,0.5)]"
+        :class="{ 'pet-typing-caret': isTyping }"
         :style="{ maxHeight: `calc(var(--dialog-h) - 52px)` }"
       ></div>
     </div>
@@ -114,4 +115,21 @@ defineExpose({
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+/* 打字进行中的细条闪烁光标（与主界面打字光标呼应，尺寸适配桌宠小字） */
+.pet-typing-caret::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: -0.15em;
+  background: #67e8f9;
+  animation: pet-caret-blink 0.8s steps(1) infinite;
+}
+@keyframes pet-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+</style>

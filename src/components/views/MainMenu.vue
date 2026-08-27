@@ -15,13 +15,15 @@
 
     <!-- 流星层（SVG动画） -->
     <MeteorAnimation
-      :meteors-enabled="meteorsEnabled"
+      v-if="meteorsEnabled"
+      :meteors-enabled="true"
       :meteor-fps="meteorFps"
     />
 
     <!-- 星星粒子层（位于背景和人物之间） -->
     <StarAnimation
-      :stars-enabled="starsEnabled"
+      v-if="starsEnabled"
+      :stars-enabled="true"
       :stars-layer-ref="starsLayerRef"
       :stars-fps="starsFps"
     />
@@ -30,7 +32,7 @@
     <img
       class="character-image"
       ref="charRef"
-      src="../../assets/images/alona.png"
+      src="../../assets/images/alona.webp"
       :alt="$t('views.mainMenu.characterAlt')" 
     />
 
@@ -90,19 +92,20 @@
 <script setup lang="ts">
 import { StartLogo, StartPage } from './menu/base'
 import { WorkshopOptions, GameModeOptions, MainMenuOptions, ScriptModeOptions } from './menu/page'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { MainChat } from './'
-import { SettingsPanel as Settings } from '../settings/'
 import { useUIStore } from '../../stores/modules/ui/ui'
 import { useSettingsStore } from '../../stores/modules/settings'
 import { getScriptList, type ScriptSummary } from '@/api/services/script-info'
-import { invoke } from '@tauri-apps/api/core'
-import { useGameStore } from '../../stores/modules/game'
-import { applyWebInitData } from '../../stores/modules/game/actions'
-import type { WebInitData } from '@/api/services/game-info'
-import MeteorAnimation from '../game/standard/animations/MeteorAnimation.vue'
-import StarAnimation from '../game/standard/animations/StarAnimation.vue'
+
+const MainChat = defineAsyncComponent(() => import('./MainChat.vue'))
+const Settings = defineAsyncComponent(() => import('../settings/SettingsPanel.vue'))
+const MeteorAnimation = defineAsyncComponent(
+  () => import('../game/standard/animations/MeteorAnimation.vue'),
+)
+const StarAnimation = defineAsyncComponent(
+  () => import('../game/standard/animations/StarAnimation.vue'),
+)
 import { useParallaxAnimation } from '../game/standard/animations/ParallaxAnimation'
 import { useI18n } from 'vue-i18n'
 
@@ -147,32 +150,6 @@ function showWorkshopMenu() {
 }
 function goToGithub() {
   window.open('https://github.com/SlimeBoyOwO/LingChat', '_blank')
-}
-
-const handleContinueGame = async () => {
-  try {
-    const { saves } = await invoke<{ saves: Array<{ id: number }>; total: number }>('list_saves', {
-      page: 1,
-      pageSize: 1,
-    })
-    if (!saves || saves.length === 0) {
-      uiStore.showWarning({
-        title: t('views.mainMenu.noSaveTitle'),
-        message: t('views.mainMenu.noSaveMessage'),
-      })
-      return
-    }
-    const gameInfo = await invoke<WebInitData>('load_save', { saveId: saves[0].id })
-    const gameStore = useGameStore()
-    applyWebInitData(gameStore.$state, gameInfo)
-    router.push('/chat')
-  } catch (error) {
-    console.error('继续游戏失败:', error)
-    uiStore.showError({
-      title: t('views.mainMenu.continueFailTitle'),
-      message: t('views.mainMenu.continueFailMessage'),
-    })
-  }
 }
 
 function handleOpenSettings(tab?: string) {

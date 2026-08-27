@@ -14,6 +14,8 @@ use crate::manifest::FileEntry;
 pub struct DeviceIdentity {
     pub device_id: String,
     pub device_name: String,
+    #[serde(default)]
+    pub sync_token: String,
 }
 
 // ─── 发现阶段 ────────────────────────────────────────────────
@@ -36,6 +38,9 @@ pub struct PeerInfo {
     pub data_version: u64,
     /// 对端的文件总数
     pub file_count: u64,
+    /// 对端 HTTP API 配对令牌（发现阶段下发，请求时放入 X-LingChat-Token）
+    #[serde(default)]
+    pub sync_token: String,
 }
 
 /// UDP 广播发现消息。
@@ -49,6 +54,8 @@ pub struct DiscoveryMessage {
     pub port: u16,
     pub data_version: u64,
     pub file_count: u64,
+    #[serde(default)]
+    pub sync_token: String,
 }
 
 // ─── mDNS TXT 记录键名 ───────────────────────────────────────
@@ -58,6 +65,32 @@ pub const TXT_INSTANCE_ID: &str = "iid";
 pub const TXT_DEVICE_NAME: &str = "name";
 pub const TXT_DATA_VERSION: &str = "ver";
 pub const TXT_FILE_COUNT: &str = "cnt";
+pub const TXT_SYNC_TOKEN: &str = "tok";
+pub const TOKEN_HEADER: &str = "x-lingchat-token";
+
+pub fn pairing_pin(token: &str) -> String {
+    token
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(6)
+        .collect::<String>()
+        .to_uppercase()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LanServerInfo {
+    pub port: u16,
+    pub pairing_pin: String,
+}
+
+pub fn token_matches(provided: &str, token: &str) -> bool {
+    if provided.is_empty() || token.is_empty() {
+        return false;
+    }
+    let provided = provided.trim();
+    provided == token || provided.eq_ignore_ascii_case(&pairing_pin(token))
+}
 
 /// mDNS 服务类型
 pub const MDNS_SERVICE_TYPE: &str = "_lingchat-sync._tcp.local.";

@@ -9,18 +9,36 @@
       @animationend="handleAnimationEnd"
     >
       <!-- 使用单独提取出来的图片淡入淡出组件 -->
+      <!-- 原版 LingChat 立绘自带白色辉光（galgame.css 的 drop-shadow），增强与背景的分离感 -->
       <ImageAcrossFade
         ref="imageFadeRef"
         class="absolute w-full h-[102%]"
         :class="containerClasses"
+        :style="{ filter: 'drop-shadow(0 0 18px rgba(255, 255, 255, 0.7))' }"
         :src="targetAvatarUrl"
         :duration="300"
         position="center bottom"
         :object-fit="computedObjectFit"
       />
 
-      <!-- 气泡 -->
-      <div :class="bubbleClasses" :style="bubbleStyles" class="bubble"></div>
+      <!-- 气泡：钉在立绘左上角，带弹出、光晕、闪烁特效 -->
+      <div
+        v-if="bubbleAnchorStyle"
+        class="bubble-anchor"
+        :class="bubbleAnchorClasses"
+        :style="bubbleAnchorStyle"
+      >
+        <div class="bubble-halo"></div>
+        <div
+          :class="bubbleClasses"
+          class="bubble"
+          :style="{ backgroundImage: `url(${currentBubbleImageUrl})` }"
+        >
+          <span class="bubble-sparkle s1"></span>
+          <span class="bubble-sparkle s2"></span>
+          <span class="bubble-sparkle s3"></span>
+        </div>
+      </div>
 
       <!-- 情绪音效 -->
       <audio ref="bubbleAudio"></audio>
@@ -29,15 +47,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, toRefs } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { convertFileSrc } from '@tauri-apps/api/core'
+import { ref, computed, toRefs } from 'vue'
 import { useGameStore } from '@/stores/modules/game'
 import { useUIStore } from '@/stores/modules/ui/ui'
-import { EMOTION_CONFIG, EMOTION_CONFIG_EMO } from '@/controllers/emotion/config'
 import type { GameRole } from '@/stores/modules/game/state'
 import TouchAreas from './TouchAreas.vue'
 import ImageAcrossFade from '@/components/ui/ImageAcrossFade.vue'
+import { spriteBoostFor } from '@/constants/sprite'
+import { useEmotionPlayback } from '@/composables/useEmotionPlayback'
 import './avatar-animation.css'
 
 const props = defineProps<{
@@ -50,14 +67,37 @@ const { role } = toRefs(props)
 
 const bubbleAudio = ref<HTMLAudioElement | null>(null)
 const imageFadeRef = ref<InstanceType<typeof ImageAcrossFade> | null>(null)
+const spriteNaturalSize = ref<{ w: number; h: number } | null>(null)
 
-const activeAnimationClass = ref('normal')
-const isBubbleVisible = ref(false)
-const currentBubbleImageUrl = ref('')
-const currentBubbleClass = ref('')
+async function loadNaturalSize(src: string): Promise<{ w: number; h: number } | null> {
+  if (!src) return null
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
+    img.onerror = () => resolve(null)
+    img.src = src
+  })
+}
 
-let bubbleTimeoutId: number | null = null
-let latestEmotionId = 0
+const {
+  targetAvatarUrl,
+  activeAnimationClass,
+  isBubbleVisible,
+  currentBubbleImageUrl,
+  currentBubbleClass,
+  handleAnimationEnd,
+} = useEmotionPlayback({
+  role,
+  imageFadeRef,
+  bubbleAudio,
+  restartBubble: true,
+  onAvatarUrl: async (url) => {
+    spriteNaturalSize.value = url ? await loadNaturalSize(url) : null
+  },
+})
+
+// 原版 LingChat 立绘占比更大，这里在角色配置 scale 基础上整体放大到适中大小
+const renderScale = computed(() => role.value.scale * spriteBoostFor(uiStore.aspectRatio))
 
 // --- 移动端适配：从 uiStore 读取视口尺寸（全局唯一 resize 监听） ---
 
@@ -112,7 +152,7 @@ const containerStyle = computed(() => {
   const style: Record<string, string> = {
     left: `calc(${autoLeft}% + ${manualOffset}px)`,
     top: `${role.value.offsetY - narrowScreenYCompensation.value - wideScreenYCompensation.value}px`,
-    transform: `translateX(-50%) scale(${role.value.scale})`,
+    transform: `translateX(-50%) scale(${renderScale.value})`,
     opacity: `${role.value.show ? 1 : 0}`,
     zIndex: '1',
   }
@@ -132,160 +172,46 @@ const bubbleClasses = computed(() => ({
   [currentBubbleClass.value]: isBubbleVisible.value && currentBubbleClass.value,
 }))
 
-const bubbleStyles = computed(() => ({
-  left: `${+role.value.bubbleLeft + 5}%`,
-  top: `${+role.value.bubbleTop - 5}%`,
-  backgroundImage: `url(${currentBubbleImageUrl.value})`,
+const bubbleAnchorClasses = computed(() => ({
+  'is-active': isBubbleVisible.value,
+  [currentBubbleClass.value]: isBubbleVisible.value && currentBubbleClass.value,
 }))
 
-const targetAvatarUrl = ref('')
-
-let resolveAvatarId = 0
-
-async function resolveAvatar() {
-  const r = role.value
-  const clothesName = r.clothesName === '默认' || !r.clothesName ? 'default' : r.clothesName
-  const emotion = r.emotion
-  const mappedEmotion = EMOTION_CONFIG_EMO[emotion] || '正常'
-
-  const currentId = ++resolveAvatarId
-  try {
-    const path = await invoke<string>('get_avatar_file', {
-      characterFolder: r.character_folder,
-      emotion: mappedEmotion,
-      clothesName,
-    })
-    if (currentId === resolveAvatarId) {
-      targetAvatarUrl.value = convertFileSrc(path)
-    }
-  } catch {
-    if (currentId === resolveAvatarId) {
-      targetAvatarUrl.value = ''
-    }
+// 立绘在图片元素内的实际显示区域（容器未缩放的局部 px，object-fit: center bottom）
+const spriteRect = computed(() => {
+  const nat = spriteNaturalSize.value
+  if (!nat || !nat.w || !nat.h) return null
+  const W = uiStore.viewportWidth
+  const H = uiStore.viewportHeight * 1.02 // ImageAcrossFade 元素为 h-[102%]
+  let dw: number
+  let dh: number
+  const m = /^auto\s+([\d.]+)%$/.exec(computedObjectFit.value)
+  if (m) {
+    dh = (H * parseFloat(m[1])) / 100
+    dw = nat.w * (dh / nat.h)
+  } else {
+    const k = Math.min(W / nat.w, H / nat.h)
+    dw = nat.w * k
+    dh = nat.h * k
   }
-}
+  return { x: (W - dw) / 2, y: H - dh, w: dw, h: dh }
+})
 
-watch(
-  () => [
-    role.value.roleId,
-    role.value.emotion,
-    role.value.clothesName,
-    role.value.character_folder,
-  ],
-  () => resolveAvatar(),
-  { immediate: true },
-)
-
-// 监听表情，配合子组件的加载状态播放特效
-watch(
-  () => role.value.emotion,
-  async (newEmotion) => {
-    const currentId = ++latestEmotionId
-
-    // 1. 等待异步头像路径解析完成
-    await resolveAvatar()
-
-    // 2. 等待 Vue 更新 DOM 并传递给子组件
-    await nextTick()
-
-    // 3. 等待子组件的图片加载 Promise 结束
-    if (imageFadeRef.value) {
-      await imageFadeRef.value.waitForLoad()
-    }
-
-    // 检查是否仍然是最新的表情更新
-    if (currentId !== latestEmotionId) return
-
-    const config = EMOTION_CONFIG[newEmotion]
-    if (!config) return
-
-    if (config.animation && config.animation !== 'none') {
-      activeAnimationClass.value = config.animation
-    }
-
-    if (config.bubbleImage && config.bubbleImage !== 'none') {
-      const version = Date.now()
-      currentBubbleImageUrl.value = `${config.bubbleImage}?t=${version}#t=0.1`
-      currentBubbleClass.value = config.bubbleClass
-      isBubbleVisible.value = false
-      nextTick(() => {
-        isBubbleVisible.value = true
-
-        if (bubbleTimeoutId !== null) {
-          window.clearTimeout(bubbleTimeoutId)
-        }
-        bubbleTimeoutId = window.setTimeout(() => {
-          isBubbleVisible.value = false
-          bubbleTimeoutId = null
-        }, 2000)
-      })
-    }
-
-    if (config.audio && config.audio !== 'none') {
-      playBubbleAudio(config.audio)
-    }
-  },
-  { immediate: true },
-)
-
-// 播放情绪气泡音效（音量跟随「气泡音量」设置，否则恒为满音量）
-const playBubbleAudio = (src: string) => {
-  if (!bubbleAudio.value) return
-  bubbleAudio.value.volume = uiStore.bubbleVolume / 100
-  bubbleAudio.value.src = src
-  bubbleAudio.value.load()
-  bubbleAudio.value.play().catch((e) => console.error('气泡音效播放失败:', e))
-}
-
-// 气泡音量设置变化时，对已加载的音效实时生效
-watch(
-  () => uiStore.bubbleVolume,
-  (v) => {
-    if (bubbleAudio.value) bubbleAudio.value.volume = v / 100
-  },
-)
-
-// 思考中反馈：气泡 + 音效（由 currentStatus 驱动，与 emotion 解耦）
-watch(
-  () => gameStore.currentStatus,
-  (newStatus) => {
-    if (newStatus === 'thinking') {
-      const config = EMOTION_CONFIG['AI思考']
-      if (config && config.bubbleImage && config.bubbleImage !== 'none') {
-        currentBubbleImageUrl.value = config.bubbleImage
-        currentBubbleClass.value = config.bubbleClass
-
-        if (bubbleTimeoutId !== null) {
-          window.clearTimeout(bubbleTimeoutId)
-          bubbleTimeoutId = null
-        }
-        if (!isBubbleVisible.value) {
-          isBubbleVisible.value = true
-        }
-        bubbleTimeoutId = window.setTimeout(() => {
-          isBubbleVisible.value = false
-          bubbleTimeoutId = null
-        }, 2000)
-      }
-      if (config?.audio && config.audio !== 'none') {
-        playBubbleAudio(config.audio)
-      }
-    } else {
-      // 离开思考态：隐藏思考气泡、停掉定时器
-      isBubbleVisible.value = false
-      if (bubbleTimeoutId !== null) {
-        window.clearTimeout(bubbleTimeoutId)
-        bubbleTimeoutId = null
-      }
-    }
-  },
-)
-
-const handleAnimationEnd = () => {
-  if (activeAnimationClass.value !== 'normal') {
-    activeAnimationClass.value = 'normal'
+const bubbleAnchorStyle = computed(() => {
+  const rect = spriteRect.value
+  if (!rect) return null
+  const s = renderScale.value || 1
+  const boxH = (uiStore.viewportHeight * 0.22) / s
+  const boxW = boxH * 0.9
+  return {
+    left: `${rect.x - boxW * 0.28}px`,
+    top: `${rect.y - boxH * 0.12}px`,
+    width: `${boxW}px`,
+    height: `${boxH}px`,
   }
-}
+})
+
+
 </script>
 
 <style scoped>

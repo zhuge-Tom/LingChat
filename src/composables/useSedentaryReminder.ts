@@ -7,6 +7,7 @@
  * 在 App.vue 中调用一次以激活全局定时器。
  */
 import { watch, onUnmounted } from 'vue'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   sendNotification,
   isPermissionGranted,
@@ -64,7 +65,6 @@ async function showReminderNotification(): Promise<void> {
 function startTimer(): void {
   stopTimer()
   timerId = setInterval(showReminderNotification, REMINDER_INTERVAL_MS)
-  console.log('[SedentaryReminder] 定时器已启动（间隔 40 分钟）')
 }
 
 /** 停止定时器 */
@@ -72,7 +72,6 @@ function stopTimer(): void {
   if (timerId !== null) {
     clearInterval(timerId)
     timerId = null
-    console.log('[SedentaryReminder] 定时器已停止')
   }
 }
 
@@ -82,6 +81,8 @@ function stopTimer(): void {
  * 应在 App.vue 等始终挂载的组件中调用。
  */
 export function useSedentaryReminder(): void {
+  if (getCurrentWindow().label !== 'main') return
+
   const settingsStore = useSettingsStore()
 
   watch(

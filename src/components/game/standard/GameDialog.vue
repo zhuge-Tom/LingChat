@@ -7,7 +7,9 @@
       scrollbar-thin
       [scrollbar-color:var(--accent-color)_transparent]
       justify-center
-      p-3.75
+      px-5
+      pt-4
+      pb-3.5
       transition-all
       duration-200
       ease-[cubic-bezier(0.25,0.46,0.45,0.94)]
@@ -16,16 +18,17 @@
       before:-top-10
       before:right-0
       before:left-0
-      before:h-10
+      before:h-14
       before:bg-linear-to-b
       before:from-transparent
-      before:via-[rgba(0,14,39,0.3)]
-      before:to-[rgba(0,14,39,0.6)]
+      before:via-[rgba(0,14,39,0.18)]
+      before:to-[rgba(0,14,39,0.45)]
       before:content-['']"
     :class="{
       [`z-[-1]!
       overflow-hidden
       opacity-0
+      translate-y-6
       duration-500!
       ease-linear
       before:opacity-0
@@ -41,15 +44,18 @@
     >
       <div class="overflow-y-auto">
         <!-- 标题栏 -->
-        <div class="mb-2
+        <div class="mb-2.5
           flex
-          items-baseline">
+          flex-wrap
+          items-center">
           <!-- 角色名称 -->
           <div
-            class="mr-3.75
+            class="nameplate
+              mr-3
               font-[inherit]
-              text-2xl
+              text-[1.7rem]
               font-bold
+              leading-tight
               text-shadow-[inherit]"
             :class="{
               [`min-w-0
@@ -62,254 +68,48 @@
             <div id="character">{{ uiStore.showCharacterTitle }}</div>
           </div>
           <div
-            v-show="!uiStore.isNarrowScreen"
+            v-show="!uiStore.isNarrowScreen && uiStore.showCharacterSubtitle"
             class="font-[inherit]
-              text-xl
-              font-bold
-              text-[#6eb4ff]
+              text-lg
+              font-semibold
+              tracking-wide
+              text-[#8ec5ff]/90
               text-shadow-[inherit]"
           >
             <div id="character-sub">{{ uiStore.showCharacterSubtitle }}</div>
           </div>
 
-          <!-- 情绪标签 -->
-          <div
-            class="mx-4
-              shrink-0
-              font-[inherit]
-              text-xl
-              font-bold
-              text-[#ff77dd]
-              text-shadow-[inherit]"
-          >
-            <div id="character-emotion">{{ uiStore.showCharacterEmotion }}</div>
-          </div>
-
-          <!-- 操作按钮组配置 -->
-          <div class="ml-auto
-            flex
-            min-w-0
-            items-baseline">
-            <!-- 桌面端：直接显示所有操作按钮 -->
-            <template v-if="!isMobile">
-              <!-- 操作按钮组 -->
-              <div
-                class="custom-scroll
-                  overflow-x-auto"
-                :class="
-                  uiStore.isNarrowScreen
-                    ? `min-w-0
-                      flex-1`
-                    : 'shrink-0'
-                "
-              >
-                <div class="flex
-                  whitespace-nowrap">
-                  <Button
-                    type="nav"
-                    icon="background"
-                    :title="$t('game.dialog.sceneSettings')"
-                    @click="openSceneSettings"
-                  ></Button>
-                  <!-- 
-                  <Button
-                    type="nav"
-                    icon="hand"
-                    :title="$t('game.dialog.touchMode')"
-                    @click="toggleTouchMode"
-                    @contextmenu.prevent="exitTouchMode"
-                  ></Button>
-                  -->
-                  <Button
-                    type="nav"
-                    icon="history"
-                    :title="$t('game.dialog.history')"
-                    @click="openHistory"
-                  ></Button>
-
-                  <!-- 语音输入按钮 -->
-                  <Button
-                    type="nav"
-                    icon="mic"
-                    :title="
-                      isRecording ? $t('game.dialog.recordingStop') : $t('game.dialog.voiceInput')
-                    "
-                    :class="{
-                      [`animate-pulse
-                      text-red-500`]: isRecording,
-                    }"
-                    @click="toggleRecording"
-                  ></Button>
-
-                  <div class="group
-                    relative
-                    inline-flex">
-                    <div
-                      v-if="hasScreenshot"
-                      class="pointer-events-none
-                        absolute
-                        bottom-full
-                        left-1/2
-                        z-50
-                        mb-2
-                        -translate-x-1/2
-                        opacity-0
-                        transition-opacity
-                        duration-200
-                        group-hover:opacity-100"
-                    >
-                      <img
-                        :src="'data:image/jpeg;base64,' + screenshotBase64"
-                        class="max-h-64
-                          max-w-96
-                          rounded-lg
-                          border-2
-                          object-contain
-                          shadow-lg"
-                        style="border-color: var(--accent-color); background: #000"
-                      />
-                    </div>
-                    <Button
-                      type="nav"
-                      icon="camera"
-                      :title="
-                        hasScreenshot
-                          ? $t('game.dialog.screenshotRetake')
-                          : $t('game.dialog.screenshotAsk')
-                      "
-                      :style="hasScreenshot ? { color: 'var(--accent-color)' } : {}"
-                      @click="startScreenshot"
-                      @contextmenu.prevent="clearScreenshot"
-                    ></Button>
-                  </div>
-
-                  <Button
-                    type="nav"
-                    icon="close"
-                    :title="$t('game.dialog.closeDialog')"
-                    @click="removeDialog"
-                  ></Button>
-                </div>
-              </div>
-            </template>
-
-            <!-- 移动端：箭头折叠按钮 + 关闭按钮 -->
+          <Transition name="emotion-pop" mode="out-in">
             <div
-              v-if="isMobile"
-              class="flex
-                items-baseline
-                gap-1"
+              v-if="uiStore.showCharacterEmotion"
+              id="character-emotion"
+              :key="uiStore.showCharacterEmotion"
+              class="emotion-chip"
             >
-              <button
-                class="mobile-toggle-btn"
-                :class="{ 'is-open': showMobileMenu }"
-                :title="$t('game.dialog.moreActions')"
-                @click="showMobileMenu = !showMobileMenu"
-              >
-                ▲
-              </button>
-              <Button
-                type="nav"
-                icon="close"
-                :title="$t('game.dialog.closeDialog')"
-                @click="removeDialog"
-              ></Button>
+              {{ uiStore.showCharacterEmotion }}
             </div>
-          </div>
+          </Transition>
+
+          <GameDialogActions
+            :is-mobile="isMobile"
+            :narrow="uiStore.isNarrowScreen"
+            v-model:show-mobile-menu="showMobileMenu"
+            :is-recording="isRecording"
+            :has-screenshot="hasScreenshot"
+            :screenshot-base64="screenshotBase64"
+            @scene="openSceneSettings"
+            @history="openHistory"
+            @record="toggleRecording"
+            @screenshot="startScreenshot"
+            @clear-screenshot="clearScreenshot"
+            @close="removeDialog"
+            @touch="toggleTouchMode"
+            @exit-touch="exitTouchMode"
+          />
         </div>
 
-        <!-- 移动端：折叠菜单下拉面板 -->
-        <Transition name="mobile-menu">
-          <div
-            v-if="isMobile && showMobileMenu"
-            class="mobile-menu-dropdown"
-          >
-            <div class="custom-scroll
-              flex
-              gap-1
-              overflow-x-auto
-              pb-1
-              whitespace-nowrap">
-              <Button
-                type="nav"
-                icon="background"
-                :title="$t('game.dialog.sceneSettings')"
-                @click="onMobileMenuAction(openSceneSettings)"
-              ></Button>
-              <Button
-                type="nav"
-                icon="hand"
-                :title="$t('game.dialog.touchMode')"
-                @click="onMobileMenuAction(toggleTouchMode)"
-                @contextmenu.prevent="exitTouchMode"
-              ></Button>
-              <Button
-                type="nav"
-                icon="history"
-                :title="$t('game.dialog.history')"
-                @click="onMobileMenuAction(openHistory)"
-              ></Button>
-              <Button
-                type="nav"
-                icon="mic"
-                :title="
-                  isRecording ? $t('game.dialog.recordingStop') : $t('game.dialog.voiceInput')
-                "
-                :class="{
-                  [`animate-pulse
-                  text-red-500`]: isRecording,
-                }"
-                @click="onMobileMenuAction(toggleRecording)"
-              ></Button>
-              <div class="group
-                relative
-                inline-flex">
-                <div
-                  v-if="hasScreenshot"
-                  class="pointer-events-none
-                    absolute
-                    bottom-full
-                    left-1/2
-                    z-50
-                    mb-2
-                    -translate-x-1/2
-                    opacity-0
-                    transition-opacity
-                    duration-200
-                    group-hover:opacity-100"
-                >
-                  <img
-                    :src="'data:image/jpeg;base64,' + screenshotBase64"
-                    class="max-h-64
-                      max-w-96
-                      rounded-lg
-                      border-2
-                      object-contain
-                      shadow-lg"
-                    style="border-color: var(--accent-color); background: #000"
-                  />
-                </div>
-                <Button
-                  type="nav"
-                  icon="camera"
-                  :title="
-                    hasScreenshot
-                      ? $t('game.dialog.screenshotRetake')
-                      : $t('game.dialog.screenshotAsk')
-                  "
-                  :style="hasScreenshot ? { color: 'var(--accent-color)' } : {}"
-                  @click="onMobileMenuAction(startScreenshot)"
-                  @contextmenu.prevent="onMobileMenuAction(clearScreenshot)"
-                ></Button>
-              </div>
-            </div>
-          </div>
-        </Transition>
-
         <!-- 分割线 -->
-        <div class="my-1.5
-          h-px
-          bg-white/30"></div>
+        <div class="dialog-rule"></div>
 
         <!-- 输入区 -->
         <div
@@ -337,18 +137,19 @@
             class="inline-motion-display
               my-1.25
               max-h-[50vh]
-              min-h-30
+              min-h-32
               flex-1
               resize-none
               overflow-y-auto
               border-none
               bg-transparent
               font-[inherit]
-              text-xl
+              text-2xl
               font-bold
               whitespace-pre-line
               outline-none
               text-shadow-[inherit]"
+            :class="{ 'typing-caret': isTyping }"
             @keydown.enter.exact.prevent="sendOrContinue"
           ></div>
 
@@ -359,13 +160,13 @@
             ref="textareaRef"
             class="my-1.25
               max-h-[50vh]
-              min-h-30
+              min-h-32
               flex-1
               resize-none
               border-none
               bg-transparent
               font-[inherit]
-              text-xl
+              text-2xl
               font-bold
               transition-all
               duration-300
@@ -373,7 +174,7 @@
               text-shadow-[inherit]
               placeholder:text-white/50
               placeholder:shadow-none"
-            :class="textareaMotionClass"
+            :class="[textareaMotionClass, { 'typing-caret-border': isTyping }]"
             :placeholder="placeholderText"
             v-model="inputMessage"
             @keydown.enter.exact.prevent="sendOrContinue"
@@ -381,31 +182,11 @@
           ></textarea>
         </div>
       </div>
-      <!-- 发送按钮（内层右侧外部） -->
+      <!-- 发送按钮（内层右侧外部；原版为 20px 加粗并横向拉伸的 ▼） -->
       <button
         id="sendButton"
-        class="absolute
-          right-0
-          bottom-0
-          translate-x-full
-          cursor-pointer
-          rounded-[5px]
-          border-none
-          bg-transparent
-          px-2
-          py-2
-          font-[inherit]
-          text-sm
-          font-bold
-          text-[#04bcff]
-          transition-all
-          duration-300
-          text-shadow-[inherit]
-          hover:bg-transparent
-          hover:text-[rgba(136,255,251,0.827)]
-          disabled:cursor-not-allowed
-          disabled:bg-[#333]
-          disabled:opacity-70"
+        class="continue-btn"
+        :class="{ 'continue-pulse': gameStore.currentStatus === 'responding' }"
         :disabled="isSending"
         @click="sendOrContinue"
       >
@@ -418,19 +199,20 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Button } from '../../base'
+import GameDialogActions from './GameDialogActions.vue'
 import { useGameStore } from '../../../stores/modules/game'
 import { useUIStore } from '../../../stores/modules/ui/ui'
 import { useDialogStore } from '../../../stores/modules/ui/dialog'
 import { useSettingsStore } from '../../../stores/modules/settings'
-import { useLlmProvidersStore } from '../../../stores/modules/llm-providers'
 import { useTypeWriter } from '../../../composables/ui/useTypeWriter'
 import { useDialogAppearance } from '../../../composables/useDialogAppearance'
-import { escapeHtml } from '../../../utils/escapeHtml'
-import { eventQueue } from '../../../core/events/event-queue'
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { buildInlineMotionHtml } from '../../../utils/inlineMotionHtml'
 import { setInputHasText } from '../../../composables/useCanDeliver'
+import { useSpeechRecognition } from '../../../composables/useSpeechRecognition'
+import { useDialogScreenshot } from '../../../composables/useDialogScreenshot'
+import { useTouchMode } from '../../../composables/useTouchMode'
+import { useDialogSend } from '../../../composables/useDialogSend'
+import { useDialogChrome } from '../../../composables/useDialogChrome'
 
 const inputMessage = ref('')
 const { t } = useI18n()
@@ -443,7 +225,6 @@ const gameStore = useGameStore()
 const uiStore = useUIStore()
 const dialogStore = useDialogStore()
 const settingsStore = useSettingsStore()
-const llmStore = useLlmProvidersStore()
 
 // Dialog appearance managed by composable: useDialogAppearance
 const { isHidden, hide, dialogWrapperStyle, dialogTextColorValue, handleWheelHistory } =
@@ -463,21 +244,31 @@ const isInlineDisplayMode = computed(
   () => settingsStore.text.inlineMotionText && gameStore.currentStatus === 'responding',
 )
 
-// 语音识别相关状态
-const isRecording = ref(false)
-const interimText = ref('') // 新增：用于实时存储临时识别出来的文本
-let speechRecognition: any = null
+const {
+  isRecording,
+  interimText,
+  init: initSpeechRecognition,
+  toggleRecording,
+} = useSpeechRecognition({
+  onFinal: (text) => {
+    inputMessage.value = text
+    send()
+  },
+  canStart: () => gameStore.currentStatus === 'input',
+  onBlocked: () => dialogStore.alert(t('game.dialog.inputNotAllowed')),
+  onUnsupported: () => dialogStore.alert(t('game.dialog.speechNotSupported')),
+})
 
-// 截图相关状态
-const hasScreenshot = ref(false)
-const screenshotBase64 = ref<string | null>(null)
-const isCapturing = ref(false)
+const { hasScreenshot, screenshotBase64, isCapturing, bind: bindScreenshot, startScreenshot, clearScreenshot } =
+  useDialogScreenshot(() => dialogStore.alert(t('game.dialog.screenshotFailed')))
+const { toggleTouchMode, exitTouchMode } = useTouchMode()
+const { placeholderText, isInputEnabled, isSending } = useDialogChrome(isRecording, interimText)
 
 // 响应式容器宽度（窄屏判断从 uiStore 读取）
 const containerWidth = ref(60)
 
 const updateContainerWidth = () => {
-  containerWidth.value = Math.max(60, uiStore.aspectRatio > 1 ? 70 : 90)
+  containerWidth.value = Math.max(60, uiStore.aspectRatio > 1 ? 75 : 90)
   isMobile.value = uiStore.aspectRatio <= 1
   if (!isMobile.value) showMobileMenu.value = false
 }
@@ -488,29 +279,11 @@ const openSceneSettings = () => {
 }
 
 // 移动端菜单操作：执行动作后自动收起菜单
-const onMobileMenuAction = (action: () => void) => {
-  action()
-  showMobileMenu.value = false
-}
 const currentDisplayedText = ref('')
 
-/**
- * 内联显示写入函数：根据文本中 \n 的位置构建混色 innerHTML。
- * 换行前 → 白色 span，换行后 → 灰色 span（.motion-text-gray）。
- */
 function writeInlineHtml(_element: HTMLElement, text: string): void {
   if (!inlineDisplayRef.value) return
-  const newlineIndex = text.indexOf('\n')
-  if (newlineIndex > 0) {
-    const dialogue = escapeHtml(text.substring(0, newlineIndex))
-    const motion = escapeHtml(text.substring(newlineIndex + 1))
-    inlineDisplayRef.value.innerHTML = `<span style="color:#fff">${dialogue}</span><br><span class="motion-text-gray">${motion}</span>`
-  } else if (newlineIndex === 0) {
-    const motion = escapeHtml(text.substring(1))
-    inlineDisplayRef.value.innerHTML = `<br><span class="motion-text-gray">${motion}</span>`
-  } else {
-    inlineDisplayRef.value.innerHTML = `<span style="color:#fff">${escapeHtml(text)}</span>`
-  }
+  inlineDisplayRef.value.innerHTML = buildInlineMotionHtml(text, uiStore.isNarrationLine)
 }
 
 // 立即把当前台词写入显示元素（不经过打字动画；供挂载恢复使用）
@@ -555,26 +328,29 @@ const isTyping = computed(() =>
   isInlineDisplayMode.value ? isInlineTyping.value : isTextTyping.value,
 )
 
-const isSending = computed(() => gameStore.currentStatus === 'thinking')
-
 // textarea 动态样式（仅两段式模式使用；内联模式用 div 渲染，不需要此 class）
 const textareaMotionClass = computed(() => {
+  if (uiStore.isNarrationLine) return { 'narration-textarea': true }
   if (!isShowingMotionText.value) return {}
-  return { 'italic text-white/50 text-base': true }
+  return { 'italic text-white/50 text-xl': true }
 })
 
 const emit = defineEmits(['player-continued', 'dialog-proceed'])
+const { send, continueDialog, sendOrContinue } = useDialogSend({
+  inputMessage,
+  screenshotBase64,
+  hasScreenshot,
+  isInlineMotion: () => isInlineDisplayMode.value,
+  isInlineTyping: () => isInlineTyping.value,
+  finishInlineTyping,
+  isShowingMotionText,
+  startTextTyping,
+  emit: (event) => emit(event),
+})
 
 const openHistory = () => {
   uiStore.toggleSettings(true)
   uiStore.setSettingsTab('history')
-}
-
-const handleRightClick = (e: MouseEvent) => {
-  if (gameStore.command === 'touch') {
-    e.preventDefault()
-    exitTouchMode()
-  }
 }
 
 const handleDialogShow = (e: MouseEvent) => {
@@ -583,76 +359,6 @@ const handleDialogShow = (e: MouseEvent) => {
     isHidden.value = false
   }
 }
-
-const toggleTouchMode = () => {
-  if (gameStore.command === 'touch') {
-    exitTouchMode()
-  } else {
-    document.body.style.cursor = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' class='lucide lucide-hand-icon lucide-hand'%3E%3Cpath d='M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2'/%3E%3Cpath d='M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2'/%3E%3Cpath d='M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8'/%3E%3Cpath d='M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15'/%3E%3C/svg%3E") 0 0, auto`
-    gameStore.command = 'touch'
-    document.addEventListener('contextmenu', handleRightClick)
-  }
-}
-
-const exitTouchMode = () => {
-  document.body.style.cursor = 'default'
-  gameStore.command = null
-  document.removeEventListener('contextmenu', handleRightClick)
-}
-
-const placeholderText = computed(() => {
-  // 如果正在录音，优先展示实时的语音内容，如果没有内容则展示正在聆听
-  if (isRecording.value) {
-    return interimText.value || t('game.dialog.listening')
-  }
-
-  switch (gameStore.currentStatus) {
-    case 'input':
-      return uiStore.showPlayerHintLine || t('game.dialog.inputPlaceholder')
-    case 'thinking':
-      const currentInteractRole = gameStore.currentInteractRole
-      if (currentInteractRole) {
-        const baseMessage = currentInteractRole.thinkMessage
-        if (gameStore.thinkingLength > 0) {
-          return `${baseMessage}${t('game.dialog.thinkingDepth', { count: gameStore.thinkingLength })}`
-        }
-        return baseMessage
-      } else {
-        return t('game.dialog.waitingResponse')
-      }
-    case 'responding':
-    case 'presenting':
-      return ''
-    default:
-      return t('game.dialog.inputPlaceholder')
-  }
-})
-
-const isInputEnabled = computed(() => gameStore.currentStatus === 'input')
-
-watch(
-  () => gameStore.currentStatus,
-  (newStatus) => {
-    console.log('游戏状态变为 :', newStatus)
-    if (newStatus === 'thinking') {
-      const currentInteractRole = gameStore.currentInteractRole
-      if (currentInteractRole) {
-        //currentInteractRole.emotion = 'AI思考'
-        uiStore.showCharacterTitle = currentInteractRole.roleName
-        uiStore.showCharacterSubtitle = currentInteractRole.roleSubTitle
-      }
-    } else if (newStatus === 'input') {
-      uiStore.showCharacterTitle = gameStore.userName
-      uiStore.showCharacterSubtitle = gameStore.userSubtitle
-      uiStore.showCharacterEmotion = ''
-    } else if (newStatus === 'presenting') {
-      uiStore.showCharacterTitle = ''
-      uiStore.showCharacterSubtitle = ''
-      uiStore.showCharacterEmotion = ''
-      uiStore.showCharacterLine = ''
-    }
-  },
-)
 
 watch([() => uiStore.showCharacterLine, () => gameStore.currentStatus], ([newLine, newStatus]) => {
   if (newLine && newLine !== '' && newStatus === 'responding') {
@@ -673,6 +379,7 @@ watch([() => uiStore.showCharacterLine, () => gameStore.currentStatus], ([newLin
     stopTextTyping()
     stopInlineTyping()
     isShowingMotionText.value = false
+    uiStore.isNarrationLine = false
     inputMessage.value = ''
     currentDisplayedText.value = ''
   }
@@ -686,85 +393,7 @@ watch(isInlineDisplayMode, (visible) => {
   }
 })
 
-// === 语音识别功能实现 ===
-const initSpeechRecognition = () => {
-  const SpeechRecognition =
-    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-  if (!SpeechRecognition) {
-    console.warn('当前浏览器不支持 Web Speech API，语音功能不可用')
-    return null
-  }
 
-  const recognition = new SpeechRecognition()
-  recognition.lang = 'zh-CN' // 默认识别中文
-  // 修改：将 interimResults 设为 true 以获取中间结果
-  recognition.interimResults = true
-  recognition.maxAlternatives = 1
-
-  recognition.onstart = () => {
-    isRecording.value = true
-    interimText.value = '' // 开始录音时清空中间文本
-  }
-
-  recognition.onresult = (event: any) => {
-    let interim = ''
-    let final = ''
-
-    // 遍历所有结果，区分是最终结果还是正在识别的临时结果
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      if (event.results[i].isFinal) {
-        final += event.results[i][0].transcript
-      } else {
-        interim += event.results[i][0].transcript
-      }
-    }
-
-    if (interim) {
-      // 如果有中间结果，更新到专门的变量供 placeholder 使用
-      interimText.value = interim
-    }
-
-    if (final) {
-      // 识别完成，赋值并发送
-      interimText.value = ''
-      inputMessage.value = final
-      send()
-    }
-  }
-
-  recognition.onerror = (event: any) => {
-    console.error('语音识别出错:', event.error)
-    isRecording.value = false
-    interimText.value = ''
-  }
-
-  recognition.onend = () => {
-    isRecording.value = false
-    interimText.value = ''
-  }
-
-  return recognition
-}
-
-const toggleRecording = async () => {
-  if (!speechRecognition) {
-    await dialogStore.alert(t('game.dialog.speechNotSupported'))
-    return
-  }
-  if (isRecording.value) {
-    speechRecognition.stop()
-  } else {
-    // 如果不在允许输入的阶段，阻止录音
-    if (gameStore.currentStatus !== 'input') {
-      await dialogStore.alert(t('game.dialog.inputNotAllowed'))
-      return
-    }
-    speechRecognition.start()
-  }
-}
-
-let unlistenScreenshot: (() => void) | null = null
-let unlistenCancelled: (() => void) | null = null
 
 onMounted(async () => {
   // 模式切换重挂载：立即从 store 恢复当前台词（不重播打字动画）
@@ -775,160 +404,21 @@ onMounted(async () => {
 
   document.addEventListener('contextmenu', handleDialogShow)
   // 初始化语音识别对象
-  speechRecognition = initSpeechRecognition()
+  initSpeechRecognition()
   // 初始化容器宽度
   updateContainerWidth()
   // 监听窗口大小变化
   window.addEventListener('resize', updateContainerWidth)
 
-  // 监听截图完成事件
-  unlistenScreenshot = await listen<{ base64: string }>('screenshot:captured', (event) => {
-    screenshotBase64.value = event.payload.base64
-    hasScreenshot.value = true
-    isCapturing.value = false
-  })
-
-  // 监听截图取消事件
-  unlistenCancelled = await listen('screenshot:cancelled', () => {
-    isCapturing.value = false
-    hasScreenshot.value = false
-  })
+  await bindScreenshot()
 })
 
 onUnmounted(() => {
   document.removeEventListener('contextmenu', handleDialogShow)
   window.removeEventListener('resize', updateContainerWidth)
-  if (unlistenScreenshot) unlistenScreenshot()
-  if (unlistenCancelled) unlistenCancelled()
 })
 
-async function startScreenshot() {
-  if (isCapturing.value) return
-  isCapturing.value = true
-  try {
-    await invoke('start_screenshot')
-  } catch (error) {
-    console.error('启动截图失败:', error)
-    isCapturing.value = false
-    await dialogStore.alert(t('game.dialog.screenshotFailed'))
-  }
-}
-
-function clearScreenshot() {
-  if (hasScreenshot.value) {
-    hasScreenshot.value = false
-    screenshotBase64.value = null
-  }
-}
-
-function sendOrContinue() {
-  if (gameStore.currentStatus === 'input') {
-    send()
-  } else if (gameStore.currentStatus === 'responding') {
-    continueDialog(true)
-  }
-}
-
-function send() {
-  const text = inputMessage.value
-  if (!text.trim()) return
-
-  // 检查对话模型是否已选择
-  if (!llmStore.chatProviderId) {
-    uiStore.showNotification({
-      type: 'warning',
-      title: t('game.dialog.noModelTitle'),
-      message: t('game.dialog.noModelMessage'),
-      skipTipsCheck: true,
-    })
-    return
-  }
-
-  gameStore.appendGameMessage({
-    type: 'message',
-    displayName: gameStore.userName,
-    content: text,
-  })
-
-  // In script mode, submit input to the script engine; otherwise use chat
-  if (gameStore.runningScript) {
-    const script = gameStore.runningScript
-    const wasChoice = script.choices.length > 0
-    // 只有提交成功才清空选项。以前是无条件清空的：allow_free 为 false 时后端
-    // 会拒绝这次输入，而选项按钮已经消失、引擎仍在等待选择，玩家彻底卡死。
-    invoke('script_submit_input', { input: text })
-      .then(() => {
-        script.choices = []
-        if (script.freeDialogueInfo.isFreeDialogue) {
-          script.freeDialogueInfo.currentRound++
-        }
-      })
-      .catch((error) => {
-        console.error('发送脚本输入失败:', error)
-        gameStore.currentStatus = 'input'
-        uiStore.showNotification({
-          type: 'warning',
-          title: wasChoice ? '请点击一个选项' : '当前无法输入',
-          message: String(error),
-          skipTipsCheck: true,
-        })
-      })
-  } else {
-    invoke('send_chat_message', {
-      text,
-      screenshotBase64: screenshotBase64.value,
-    }).catch((error) => {
-      console.error('发送消息失败:', error)
-      gameStore.currentStatus = 'input'
-    })
-  }
-
-  // 发送后清除截图状态
-  hasScreenshot.value = false
-  screenshotBase64.value = null
-  inputMessage.value = ''
-}
-
-function continueDialog(isPlayerTrigger: boolean): boolean {
-  // 内联动作文本模式：第一次点击跳过打字动画，第二次推进事件队列
-  if (settingsStore.text.inlineMotionText) {
-    if (isInlineTyping.value) {
-      finishInlineTyping() // 这个函数有 bug，打字动画会结束，但是不会显示最终完整的字
-      return false // 先跳到末尾，不推进
-    }
-    const needWait = eventQueue.continue()
-    if (!needWait) {
-      uiStore.showCharacterMotionText = '' // 清空内联动作文本
-      if (isPlayerTrigger) emit('player-continued')
-      emit('dialog-proceed')
-    }
-    return needWait
-  }
-
-  // Phase 2: motion text already shown, now advance normally
-  if (isShowingMotionText.value) {
-    isShowingMotionText.value = false
-    uiStore.showCharacterMotionText = ''
-  }
-  // Phase 1: there's pending motion text, show it instead of advancing
-  else if (uiStore.showCharacterMotionText) {
-    isShowingMotionText.value = true
-    // Type the motion text into the same textarea with typewriter
-    startTextTyping(uiStore.showCharacterMotionText, uiStore.typeWriterSpeed)
-    return false // don't advance event queue
-  }
-
-  // Normal: advance to next event
-  const needWait = eventQueue.continue()
-  if (!needWait) {
-    if (isPlayerTrigger) emit('player-continued')
-    emit('dialog-proceed')
-  }
-
-  return needWait
-}
-
-function removeDialog(_e: Event) {
+function removeDialog() {
   hide()
 }
 
@@ -942,9 +432,117 @@ defineExpose({
 </script>
 
 <style scoped>
-/* 内联显示 div：外观与 textarea 一致，支持 innerHTML 混色 */
+.nameplate {
+  padding-left: 10px;
+  border-left: 3px solid var(--accent-color, #6eb4ff);
+}
+.emotion-chip {
+  margin-left: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffd0ef;
+  background: rgba(255, 119, 221, 0.16);
+  border: 1px solid rgba(255, 119, 221, 0.28);
+}
+.dialog-rule {
+  height: 1px;
+  margin: 8px 0 10px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+}
+.continue-btn {
+  position: absolute;
+  right: 0;
+  bottom: 6px;
+  transform: translateX(118%);
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(110, 180, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(4, 188, 255, 0.12);
+  color: #7de7ff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+.continue-btn:hover:not(:disabled) {
+  background: rgba(4, 188, 255, 0.28);
+  color: #e8fbff;
+  transform: translateX(118%) translateY(-1px);
+}
+.continue-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .inline-motion-display {
-  color: #9ca3af; /* fallback：极端情况下 div 直接显示文字时用灰色 */
+  color: #9ca3af;
+}
+
+/* 打字机进行中的闪烁光标（galgame 经典效果）：div 用块状光标，textarea 用右边框 */
+.typing-caret::after {
+  content: '▌';
+  margin-left: 2px;
+  color: var(--accent-color, #6eb4ff);
+  animation: caret-blink 0.8s steps(1) infinite;
+}
+.typing-caret-border {
+  border-right: 3px solid var(--accent-color, #6eb4ff);
+  animation: caret-border-blink 0.8s steps(1) infinite;
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes caret-border-blink {
+  50% {
+    border-right-color: transparent;
+  }
+}
+
+/* 回应状态下 ▼ 按钮呼吸提示：提醒玩家点击推进对话 */
+.continue-pulse {
+  animation: soft-pulse 1.6s ease-in-out infinite;
+}
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 情绪标签切换：缩小淡出 → 弹性放大进入 */
+.emotion-pop-enter-active {
+  animation: emotion-pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.emotion-pop-leave-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.emotion-pop-enter-from,
+.emotion-pop-leave-to {
+  opacity: 0;
+}
+.emotion-pop-leave-from {
+  opacity: 1;
+}
+@keyframes emotion-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* 内联模式下的动作文本灰字 span（通过 writeInlineHtml 写入 innerHTML） */
@@ -952,88 +550,16 @@ defineExpose({
   color: #9ca3af !important;
 }
 
-/* 兼容 Firefox */
-.custom-scroll {
-  scrollbar-width: thin;
+/* 剧本旁白的电影化样式：斜体、浅灰蓝、加宽字距（区别于角色台词） */
+.narration-inline {
+  color: #cbd5e1;
+  font-style: italic;
+  letter-spacing: 0.08em;
+}
+.narration-textarea {
+  color: #cbd5e1 !important;
+  font-style: italic;
+  letter-spacing: 0.08em;
 }
 
-/* 兼容 Chrome / Edge / Safari */
-.custom-scroll::-webkit-scrollbar {
-  width: 6px; /* 纵向滚动条宽度 */
-  height: 6px; /* 横向滚动条高度（你这个是 overflow-x，主要控制这个） */
-}
-
-/* 移动端折叠按钮 — 与右侧 nav 关闭按钮等大 */
-.mobile-toggle-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
-  border-radius: 8px;
-  padding: 10px 14px;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  transition: all 0.25s ease;
-  margin: 0 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 38px;
-}
-.mobile-toggle-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: var(--accent-color, #6eb4ff);
-}
-.mobile-toggle-btn:active {
-  transform: scale(0.92);
-}
-.mobile-toggle-btn > span,
-.mobile-toggle-btn {
-  transition: transform 0.25s ease;
-}
-.mobile-toggle-btn.is-open {
-  transform: rotate(180deg);
-  background: rgba(255, 255, 255, 0.18);
-  color: var(--accent-color, #6eb4ff);
-  border-color: var(--accent-color, #6eb4ff);
-}
-
-/* 移动端下拉菜单 */
-.mobile-menu-dropdown {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 8px 4px 4px;
-  margin-top: 2px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 14, 39, 0.5);
-  border-radius: 0 0 8px 8px;
-  width: 100%; /* 确保占满整个对话框宽度 */
-}
-
-/* Vue Transition: 移动端菜单展开/收起 */
-.mobile-menu-enter-active {
-  animation: menu-slide-down 0.2s ease-out;
-}
-.mobile-menu-leave-active {
-  animation: menu-slide-down 0.15s ease-in reverse;
-}
-@keyframes menu-slide-down {
-  from {
-    opacity: 0;
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    margin-top: 0;
-    border-top-width: 0;
-  }
-  to {
-    opacity: 1;
-    max-height: 200px;
-    padding-top: 8px;
-    padding-bottom: 4px;
-    margin-top: 2px;
-    border-top-width: 1px;
-  }
-}
 </style>

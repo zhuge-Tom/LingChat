@@ -1,6 +1,7 @@
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useUIStore } from '@/stores/modules/ui/ui'
 
 /**
@@ -27,9 +28,12 @@ export function setInputHasText(val: boolean) {
 export function useCanDeliver() {
   const router = useRouter()
   const uiStore = useUIStore()
-
   const canDeliver = ref(false)
   let lastInvoked: boolean | null = null
+
+  if (getCurrentWindow().label !== 'main') {
+    return { canDeliver }
+  }
 
   function recompute() {
     const onChatRoute = CHAT_ROUTES.includes(router.currentRoute.value.name as string)

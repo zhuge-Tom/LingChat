@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait,
-    QueryFilter, QuerySelect, Set, Statement,
+    PaginatorTrait, QueryFilter, QuerySelect, Set, Statement,
 };
 use tracing::warn;
 
@@ -143,6 +143,23 @@ impl RoleRepo {
             .filter(role::Column::RoleType.eq(RoleType::Main))
             .all(db)
             .await?)
+    }
+
+    pub async fn get_main_roles_page(
+        db: &DatabaseConnection,
+        page: i32,
+        page_size: i32,
+    ) -> Result<(Vec<RoleModel>, u64)> {
+        let page = page.max(1) as u64;
+        let page_size = page_size.max(1) as u64;
+        let query = role::Entity::find().filter(role::Column::RoleType.eq(RoleType::Main));
+        let total = query.clone().count(db).await?;
+        let items = query
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all(db)
+            .await?;
+        Ok((items, total))
     }
 
     /// 系统保护的角色 ID 集合，禁止删除。

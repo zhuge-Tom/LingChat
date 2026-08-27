@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full h-full flex items-center justify-between relative px-5 py-2">
+  <div class="settings-nav w-full h-full flex items-center justify-between relative px-5 py-2">
     <img src="@/assets/images/LingChatLogo.png" alt="Logo" class="w-20 ml-5 hidden xl:block" />
     <nav
       ref="navContainer"
@@ -368,6 +368,11 @@ watch(
 </script>
 
 <style lang="css" scoped>
+.settings-nav {
+  background: linear-gradient(180deg, rgba(8, 16, 32, 0.42), rgba(8, 16, 32, 0.18));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+}
 .custom-scroll ::-webkit-scrollbar {
   width: 8px;
   height: 2px;

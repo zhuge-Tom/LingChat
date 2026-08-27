@@ -61,6 +61,14 @@ fn bracket_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(r"\{([^}]+)\}").expect("invalid regex"))
 }
+fn curly_strip_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"\{[^{}]*\}").expect("invalid regex"))
+}
+fn emotion_bracket_strip_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"【[^】]*】").expect("invalid regex"))
+}
 fn temp_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| Regex::new(r"(?s)\[!Temp!\](.*?)\[/!Temp!\]").expect("invalid regex"))
@@ -112,7 +120,7 @@ impl MessageProcessor {
     }
 
     /// 解析并分类情绪片段。语义对应 Python `parse_and_classify_emotional_segments`。
-    pub fn parse_and_classify_emotional_segments(&self, text: &str) -> Vec<EmotionSegment> {
+    pub async fn parse_and_classify_emotional_segments(&self, text: &str) -> Vec<EmotionSegment> {
         let mut results: Vec<EmotionSegment> = Vec::new();
 
         // 前处理：修复标签并清理非法内容
@@ -152,7 +160,7 @@ impl MessageProcessor {
             } else if !japanese_text.is_empty() {
                 // 清理：去掉可能出现在日文里的 情绪/动作 片段
                 let step1 = motion_re().replace_all(&japanese_text, "");
-                let step2 = Regex::new(r"【[^】]*】").unwrap().replace_all(&step1, "");
+                let step2 = emotion_bracket_strip_re().replace_all(&step1, "");
                 step2.trim().replace('~', "。")
             } else {
                 japanese_text
@@ -162,15 +170,6 @@ impl MessageProcessor {
                 continue;
             }
 
-            // 情绪分类器：有分类器走 ONNX，否则回退为原 tag。
-            let (predicted, confidence) = match self.classifier.as_ref() {
-                Some(clf) => {
-                    let p = clf.predict(emotion_tag, None);
-                    (p.label, p.confidence as f64)
-                }
-                None => (emotion_tag.to_string(), 1.0),
-            };
-
             let voice_file = format!("{}_part_{}.wav", Uuid::new_v4(), i);
 
             results.push(EmotionSegment {
@@ -179,12 +178,27 @@ impl MessageProcessor {
                 following_text: cleaned_text,
                 motion_text,
                 japanese_text,
-                predicted,
-                confidence,
+                predicted: emotion_tag.to_string(),
+                confidence: 1.0,
                 voice_file,
                 character: None,
                 role_id: None,
             });
+        }
+
+        if let Some(clf) = self.classifier.as_ref() {
+            let mut handles = Vec::with_capacity(results.len());
+            for seg in &results {
+                let clf = Arc::clone(clf);
+                let tag = seg.original_tag.clone();
+                handles.push(tokio::task::spawn_blocking(move || clf.predict(&tag, None)));
+            }
+            for (seg, handle) in results.iter_mut().zip(handles) {
+                if let Ok(Ok(p)) = handle.await {
+                    seg.predicted = p.label;
+                    seg.confidence = p.confidence as f64;
+                }
+            }
         }
 
         if results.is_empty() {
@@ -200,8 +214,7 @@ impl MessageProcessor {
 
         // 3. 清理违规内容
         // 删除 {} 内容
-        let curly_re = Regex::new(r"\{[^{}]*\}").unwrap();
-        processed = curly_re.replace_all(&processed, "").to_string();
+        processed = curly_strip_re().replace_all(&processed, "").to_string();
 
         // 1. 统一括号风格
         processed = processed

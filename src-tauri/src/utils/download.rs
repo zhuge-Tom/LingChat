@@ -67,7 +67,18 @@ pub async fn download_to_file(
     progress: Option<Arc<dyn Fn(DownloadProgress) + Send + Sync>>,
     expected_size: u64,
 ) -> Result<u64, String> {
-    // 确保目标目录存在
+    download_to_file_with_headers(client, url, dest, cancel, progress, expected_size, &[]).await
+}
+
+pub async fn download_to_file_with_headers(
+    client: &reqwest::Client,
+    url: &str,
+    dest: &Path,
+    cancel: Option<Arc<CancellationToken>>,
+    progress: Option<Arc<dyn Fn(DownloadProgress) + Send + Sync>>,
+    expected_size: u64,
+    headers: &[(&str, &str)],
+) -> Result<u64, String> {
     if let Some(parent) = dest.parent() {
         tokio::fs::create_dir_all(parent)
             .await
@@ -76,12 +87,11 @@ pub async fn download_to_file(
 
     let tmp = dest.with_extension("part");
 
-    let resp = client
-        .get(url)
-        .header(reqwest::header::ACCEPT, "*/*")
-        .send()
-        .await
-        .map_err(|e| format!("request: {e}"))?;
+    let mut req = client.get(url).header(reqwest::header::ACCEPT, "*/*");
+    for (k, v) in headers {
+        req = req.header(*k, *v);
+    }
+    let resp = req.send().await.map_err(|e| format!("request: {e}"))?;
 
     if !resp.status().is_success() {
         let status = resp.status();

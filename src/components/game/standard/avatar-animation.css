@@ -102,24 +102,13 @@
   }
 }
 
-/* 呼吸动画关键帧 */
-@keyframes breathing {
-  0%,
-  100% {
-    transform: scale(1); /* 正常大小 */
-  }
-  50% {
-    transform: scale(1.0035); /* 轻微放大 */
-  }
-}
-
 /* 动画基础类 */
 .character-animation {
   animation-fill-mode: both !important;
 }
 
+/* 静止态：不做任何循环动画，避免立绘一直来回晃动影响观感 */
 .normal {
-  animation: breathing 4s ease-in-out infinite;
   transition: opacity 0.5s ease-in-out;
 }
 
@@ -182,38 +171,173 @@
   animation-iteration-count: 1;
 }
 
-/* 气泡固定定位样式 */
-.bubble {
+/* 气泡锚点盒子：位置/尺寸由组件按立绘左上角实时计算（局部 px），16:9 保证全屏帧素材不变形 */
+.bubble-anchor {
   position: absolute;
-  background-size: contain;
-  background-repeat: no-repeat;
-  width: 40%;
-  height: 40%;
   pointer-events: none;
   z-index: 2;
-
-  /* 固定显示在人物右上方 */
-  top: 5%;
-  left: 20%;
-
-  /* 默认隐藏 */
-  opacity: 0;
-  transition: opacity 0.3s;
-
-  /* 初始缩放 */
-  transform: scale(1);
 }
 
-/* 气泡显示时的动画 */
+/* 气泡本体：铺满锚点盒子，静止时隐藏 */
+.bubble {
+  position: absolute;
+  inset: 0;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  transform-origin: 50% 50%;
+  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.35));
+  will-change: transform, opacity;
+}
+
+/* 显示时：弹性弹出 + 轻微上下浮动（浮动延迟到弹出结束后接管） */
 .bubble.show {
   opacity: 1;
+  animation:
+    bubble-pop 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    bubble-float 2.4s ease-in-out 0.45s infinite;
 }
 
-/* 不同表情的气泡样式 */
-.bubble.angry {
-  transform: scale(1);
+@keyframes bubble-pop {
+  0% {
+    transform: scale(0.4) rotate(-8deg);
+  }
+  60% {
+    transform: scale(1.12) rotate(3deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
 }
 
-.bubble.happy {
-  transform: scale(1);
+@keyframes bubble-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.02);
+  }
+}
+
+/* 气泡背后的柔光晕：显示时淡入并缓慢呼吸式脉冲 */
+.bubble-halo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 80%;
+  height: 80%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 200, 240, 0.14) 45%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.bubble-anchor.is-active .bubble-halo {
+  animation: halo-pulse 2s ease-in-out infinite;
+}
+
+@keyframes halo-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+}
+
+/* 按情绪给光晕染色（对应 config 的 bubbleClass） */
+.bubble-anchor.is-active.angry .bubble-halo {
+  background: radial-gradient(
+    circle,
+    rgba(255, 96, 64, 0.38) 0%,
+    rgba(255, 128, 64, 0.16) 45%,
+    transparent 70%
+  );
+}
+
+.bubble-anchor.is-active.happy .bubble-halo {
+  background: radial-gradient(
+    circle,
+    rgba(255, 216, 96, 0.4) 0%,
+    rgba(255, 236, 160, 0.18) 45%,
+    transparent 70%
+  );
+}
+
+.bubble-anchor.is-active.shy .bubble-halo {
+  background: radial-gradient(
+    circle,
+    rgba(255, 140, 190, 0.38) 0%,
+    rgba(255, 180, 215, 0.16) 45%,
+    transparent 70%
+  );
+}
+
+/* 环绕气泡的四角星闪光，交错闪烁 */
+.bubble-sparkle {
+  position: absolute;
+  background: #fff;
+  clip-path: polygon(
+    50% 0,
+    62% 38%,
+    100% 50%,
+    62% 62%,
+    50% 100%,
+    38% 62%,
+    0 50%,
+    38% 38%
+  );
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.95));
+  opacity: 0;
+}
+
+.bubble-anchor.is-active .bubble-sparkle {
+  animation: sparkle-twinkle 1.4s ease-in-out infinite;
+}
+
+.bubble-sparkle.s1 {
+  top: 6%;
+  left: 12%;
+  width: 14px;
+  height: 14px;
+}
+
+.bubble-sparkle.s2 {
+  top: 58%;
+  left: 4%;
+  width: 9px;
+  height: 9px;
+  animation-delay: 0.5s;
+}
+
+.bubble-sparkle.s3 {
+  top: 10%;
+  left: 72%;
+  width: 11px;
+  height: 11px;
+  animation-delay: 0.9s;
+}
+
+@keyframes sparkle-twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.3) rotate(0deg);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.1) rotate(40deg);
+  }
 }

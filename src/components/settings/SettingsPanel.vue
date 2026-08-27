@@ -28,30 +28,29 @@
 </template>
 
 <script setup lang="ts">
-import {
-  SettingsText,
-  SettingsSave,
-  SettingsSound,
-  SettingsHistory,
-  SettingsAdvance,
-  SettingsCharacter,
-  SettingsBackground,
-  SettingsAchievement,
-  SettingsAdventure,
-  SettingsLog,
-  SettingsWorkshop,
-  SettingsPlugins,
-} from './pages'
+import { defineAsyncComponent, ref, watch, computed, type Component } from 'vue'
 import SettingsNav from './SettingsNav.vue'
 import { useUIStore } from '../../stores/modules/ui/ui'
-import { ref, watch, computed, type Component } from 'vue'
 import { isAndroid } from '@/utils/platform'
+
+const SettingsText = defineAsyncComponent(() => import('./pages/SettingsText.vue'))
+const SettingsSave = defineAsyncComponent(() => import('./pages/SettingsSave.vue'))
+const SettingsSound = defineAsyncComponent(() => import('./pages/SettingsSound.vue'))
+const SettingsHistory = defineAsyncComponent(() => import('./pages/SettingsHistory.vue'))
+const SettingsAdvance = defineAsyncComponent(() => import('./pages/SettingsAdvance.vue'))
+const SettingsCharacter = defineAsyncComponent(() => import('./pages/SettingsCharacter.vue'))
+const SettingsBackground = defineAsyncComponent(() => import('./pages/SettingsBackground.vue'))
+const SettingsAchievement = defineAsyncComponent(() => import('./pages/SettingsAchievement.vue'))
+const SettingsAdventure = defineAsyncComponent(() => import('./pages/SettingsAdventure.vue'))
+const SettingsLog = defineAsyncComponent(() => import('./pages/SettingsLog.vue'))
+const SettingsWorkshop = defineAsyncComponent(() => import('./pages/SettingsWorkshop.vue'))
+const SettingsPlugins = defineAsyncComponent(() => import('./pages/SettingsPlugins.vue'))
 
 const uiStore = useUIStore()
 
 // 获取 A 组件和 B 组件的 Ref 实例
 const settingsNavRef = ref<InstanceType<typeof SettingsNav> | null>(null)
-const settingsAdvanceRef = ref<InstanceType<typeof SettingsAdvance> | null>(null)
+const settingsAdvanceRef = ref<{ addMoreMenu?: () => void } | null>(null)
 
 // 添加延迟状态
 const shouldShowOverlay = ref(false)
@@ -193,7 +192,7 @@ watch(
 const onAddFromA = () => {
   // console.log('父组件收到 A 的添加事件，准备通知 B 组件');
   // 调用 B 组件实例上暴露的 removeMoreMenu 方法
-  settingsAdvanceRef.value?.addMoreMenu()
+  settingsAdvanceRef.value?.addMoreMenu?.()
 }
 
 // 当 B 组件发来 "remove-more-menu-from-b" 事件时
@@ -251,8 +250,8 @@ const onAddFromB = () => {
 
   /* 初始状态 */
   opacity: 0;
-  backdrop-filter: blur(5px);
-  background-color: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  background: radial-gradient(120% 80% at 50% 0%, rgba(20, 40, 70, 0.35), rgba(0, 0, 0, 0.52));
 
   /* 过渡效果 */
   transition: opacity 0.3s ease;

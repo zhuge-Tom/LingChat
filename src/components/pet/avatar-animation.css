@@ -190,3 +190,17 @@
 .bubble.happy {
   transform: scale(1);
 }
+
+/* 气泡弹出动画：以左下角（头像头部位置）为原点轻快放大 */
+.bubble-pop {
+  animation: bubble-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes bubble-pop {
+  from {
+    transform: scale(0.6);
+  }
+  to {
+    transform: scale(1);
+  }
+}

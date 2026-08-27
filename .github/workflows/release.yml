@@ -161,22 +161,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: 'LingChat ${{ github.ref_name }}'
-          body: |
-            ## 更新内容
-
-            请查看 [CHANGELOG](https://github.com/SlimeBoyOwO/LingChat/blob/main/CHANGELOG.md) 了解详情。
-
-            ## 安装
-
-            请根据你的平台下载对应的安装包。
-            - Windows: `.exe`
-            - macOS: `.dmg`
-            - Linux: `.AppImage` / `.deb`
-
-            ## 数据资源
-
-            如需手动更新游戏资源，请下载 `data_files.zip` 并解压到程序目录下的 `data/` 文件夹。
-          draft: true
+          body_path: CHANGELOG.md
+          draft: false
           prerelease: false
           files: |
             artifacts/data/*
